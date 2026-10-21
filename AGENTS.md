@@ -29,7 +29,7 @@
   作成: `python -m venv $env:USERPROFILE\.venv\switchbot_home; & $env:USERPROFILE\.venv\switchbot_home\Scripts\python.exe -m pip install -r requirements.txt`
 - Python 変更後は `python -m py_compile switchbot_client.py web/api.py` を実行する。
 - フロントエンド変更後は `cd web; npm.cmd run build` を実行する。
-- ローカル一括起動は `.\start_debug.ps1`（または `start_debug.bat`）。画面は `http://127.0.0.1:5174/`、API は `http://127.0.0.1:8001`（torrentsearch の 8000/5173 と衝突しないようにずらしている）。
+- ローカル一括起動は `.\start_debug.ps1`（または `start_debug.bat`）。画面は `http://127.0.0.1:5175/`、API は `http://127.0.0.1:8002`（torrentsearch（8000/5173）・radio_record（8001/5174）と衝突しないようにずらしている）。
 
 ## 本番リリース
 

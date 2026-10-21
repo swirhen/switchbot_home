@@ -9,7 +9,7 @@ User=swirhen
 Group=swirhen
 WorkingDirectory=/home/swirhen/switchbot_home/web
 EnvironmentFile=-/etc/default/switchbot-home-api
-ExecStart=/home/swirhen/switchbot_home/web/.venv/bin/uvicorn api:app --host 127.0.0.1 --port 8001
+ExecStart=/home/swirhen/switchbot_home/web/.venv/bin/uvicorn api:app --host 127.0.0.1 --port 8002
 Restart=on-failure
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1

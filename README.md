@@ -35,21 +35,21 @@ cd web
 npm install
 ```
 
-リポジトリ直下で `.\start_debug.ps1`（または `start_debug.bat`）を実行すると、API（8001）と Vite（5174）を起動して `http://127.0.0.1:5174/` を開きます。Enter で両方停止します。
+リポジトリ直下で `.\start_debug.ps1`（または `start_debug.bat`）を実行すると、API（8002）と Vite（5175）を起動して `http://127.0.0.1:5175/` を開きます。Enter で両方停止します。
 
 ## 本番
 
 - 配置先: `/home/swirhen/switchbot_home`（`prod-checker`）
-- 公開 URL: `https://swirhen.tv/switchbot_home/`（Apache が `web/dist/` を配信し、`/switchbot_home/api/` を `127.0.0.1:8001` の API へ中継）
+- 公開 URL: `https://swirhen.tv/switchbot_home/`（Apache が `web/dist/` を配信し、`/switchbot_home/api/` を `127.0.0.1:8002` の API へ中継）
 - API: systemd `switchbot-home-api.service`（`web/switchbot-home-api.service`）。venv は `web/.venv`
-- Apache 設定: `web/switchbot-home.conf` を `/etc/apache2/conf-available/` に置いて `a2enconf`
+- Apache 設定: dotfile リポジトリの `apache2/sites-available/000-default.conf`（`/torrent-admin/` と同じ書き方で `/switchbot_home/` を追記）を `/etc/apache2/sites-available/` に反映する
 - Git 管理外のファイル（`config.json`、`web/layout.json`、`web/ir_state.json`）は手元から `scp` で送る
 
 ### 初期導入
 
 ```bash
 cd /home/swirhen
-git clone https://github.com/swirhen/switchbot_home.git
+git clone git@github.com:swirhen/switchbot_home.git
 cd switchbot_home
 python3 -m venv web/.venv
 web/.venv/bin/pip install -r requirements.txt
@@ -58,9 +58,7 @@ npm ci
 sudo install -m 0644 switchbot-home-api.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now switchbot-home-api.service
-sudo install -m 0644 switchbot-home.conf /etc/apache2/conf-available/
-sudo a2enmod proxy proxy_http
-sudo a2enconf switchbot-home
+# Apache は dotfile の 000-default.conf を反映してから
 sudo apachectl configtest && sudo systemctl reload apache2
 ./release.sh
 ```
