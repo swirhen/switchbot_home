@@ -1,0 +1,387 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono&family=Space+Grotesk:wght@400;600;700&display=swap");
+
+:root {
+  font-family: "Space Grotesk", sans-serif;
+  color: #fff;
+  background: #000;
+  --panel: #0d0d0d;
+  --line: #303030;
+  --muted: #a6a6a6;
+  --green: #8ff0ad;
+  --red: #ff6262;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: #000;
+  color: #fff;
+}
+main {
+  max-width: 1500px;
+  margin: auto;
+  padding: 0 5vw 120px;
+}
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+h1 {
+  font-size: clamp(34px, 5vw, 64px);
+  line-height: 0.95;
+  margin: 24px 0 12px;
+}
+/* ヘッダーのタイトルは torrentsearch の「た、種ぇぇ」（ブラウザ標準の h2）と同じ大きさ */
+header h1 {
+  font-size: 1.5em;
+  line-height: normal;
+  margin: 12px 0;
+}
+h2 {
+  margin: 24px 0 12px;
+}
+h3 {
+  margin: 0;
+  font-size: 17px;
+}
+small {
+  font: 12px "IBM Plex Mono";
+  color: var(--muted);
+}
+.muted {
+  color: var(--muted);
+}
+.error {
+  color: var(--red);
+}
+button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 14px;
+  color: #fff;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+button:hover:not(:disabled) {
+  border-color: var(--green);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+button.active {
+  border-color: var(--green);
+  color: var(--green);
+}
+button.icon {
+  padding: 6px;
+  margin-left: auto;
+}
+button.ghost {
+  background: transparent;
+}
+input {
+  font: inherit;
+  color: #fff;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--green);
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.filters,
+.scenes,
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.devices {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.card.selected {
+  border-color: var(--green);
+}
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.status {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  font: 13px "IBM Plex Mono";
+}
+p.status {
+  display: block;
+}
+.status dt {
+  color: var(--muted);
+}
+.status dd {
+  margin: 0;
+}
+.power-on {
+  color: var(--green);
+}
+.power-off {
+  color: var(--muted);
+}
+.actions {
+  margin-top: auto;
+}
+.batch-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  max-width: calc(100vw - 32px);
+  background: #111;
+  border: 1px solid var(--green);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+.toast {
+  position: fixed;
+  right: 20px;
+  top: 20px;
+  max-width: calc(100vw - 40px);
+  background: #111;
+  border: 1px solid var(--green);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+.toast.error {
+  border-color: var(--red);
+  color: var(--red);
+}
+.login {
+  display: flex;
+  justify-content: center;
+  padding-top: 15vh;
+}
+.login form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(360px, 100%);
+}
+.login button {
+  justify-content: center;
+}
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+nav {
+  display: flex;
+  gap: 4px;
+}
+nav a {
+  color: var(--muted);
+  text-decoration: none;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+nav a.active {
+  color: var(--green);
+  border-color: var(--green);
+}
+select {
+  font: inherit;
+  font-size: 14px;
+  color: #fff;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  max-width: 100%;
+}
+.layout-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+/* レイアウトページは画面の高さに収め、縦スクロールはキャンバスの中で行う */
+main.layout-page {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding-bottom: 16px;
+}
+.canvas-wrap {
+  flex: 1;
+  min-height: 300px;
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  /* 縦スクロールバーの幅を常に確保し、その分はキャンバス（配置できる範囲）に含めない */
+  scrollbar-gutter: stable;
+}
+.canvas {
+  position: relative;
+  width: 100%;
+  min-height: 100%;
+}
+.canvas.editing {
+  background-image: radial-gradient(circle, #2a2a2a 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+.canvas-empty {
+  position: absolute;
+  inset: 40px 20px auto;
+  text-align: center;
+}
+.widget {
+  position: absolute;
+  display: flex;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.canvas.editing .widget {
+  outline: 1px dashed var(--line);
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+}
+.canvas.editing .widget.active {
+  outline: 1px solid var(--green);
+}
+.canvas.editing .widget-body {
+  pointer-events: none;
+}
+.widget-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/* 背景はウィジェット側に置き、取得時刻（z-index: 0）を本体（z-index: 1）の裏に描く */
+.widget-status {
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+.widget-status .widget-body {
+  position: relative;
+  z-index: 1;
+  padding: 10px 12px;
+  gap: 6px;
+  overflow: auto;
+}
+.widget-time {
+  position: absolute;
+  right: 8px;
+  bottom: 4px;
+  z-index: 0;
+  font-size: 10px;
+  opacity: 0.6;
+  pointer-events: none;
+}
+.widget-group {
+  border: 1px solid var(--line);
+  background: #ffffff05;
+}
+.widget-group .widget-body {
+  padding: 8px 12px;
+}
+.canvas.editing .widget.widget-group.drop-target {
+  outline: 1px solid var(--green);
+  background: #8ff0ad0d;
+}
+.widget-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+.widget-button {
+  flex: 1;
+  justify-content: center;
+  text-align: center;
+  font-size: 15px;
+  border-radius: 10px;
+}
+.widget-button:disabled {
+  opacity: 1;
+}
+.canvas:not(.editing) .widget-button:active:not(:disabled) {
+  background: #1a1a1a;
+}
+.widget-tools {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+}
+.widget-tools .icon {
+  margin: 0;
+  padding: 4px;
+  background: #000c;
+}
+.widget-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  touch-action: none;
+  background: linear-gradient(135deg, transparent 50%, var(--green) 50%);
+  border-bottom-right-radius: 10px;
+}
+.spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
