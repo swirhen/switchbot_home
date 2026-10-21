@@ -377,6 +377,164 @@ main.layout-page {
   background: linear-gradient(135deg, transparent 50%, var(--green) 50%);
   border-bottom-right-radius: 10px;
 }
+.notice {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--muted);
+}
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+th,
+td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+th {
+  font: 12px "IBM Plex Mono";
+  color: var(--muted);
+  font-weight: 400;
+  white-space: nowrap;
+}
+tbody tr:last-child td {
+  border-bottom: none;
+}
+tr.disabled td:not(:first-child) {
+  opacity: 0.45;
+}
+.nowrap {
+  white-space: nowrap;
+}
+.row-actions {
+  white-space: nowrap;
+  text-align: right;
+}
+.row-actions .icon {
+  margin-left: 4px;
+}
+input.switch {
+  appearance: none;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--line);
+  position: relative;
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
+  border: none;
+  transition: background 0.15s;
+}
+input.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.15s;
+}
+input.switch:checked {
+  background: var(--green);
+}
+input.switch:checked::after {
+  left: 18px;
+  background: #000;
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: #000a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 10;
+}
+.modal {
+  background: #0d0d0d;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  width: min(560px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+}
+.modal h2 {
+  margin-top: 0;
+}
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+}
+.form fieldset {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+}
+.form legend {
+  font-size: 14px;
+  padding: 0 4px;
+}
+.form .radios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+.form .radios label,
+.form .target-list label {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+.form .target-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.form .target-list small {
+  margin-left: 6px;
+}
+.form .time-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+.form .time-row > span {
+  padding-bottom: 10px;
+}
+.next-day {
+  color: var(--green);
+}
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
 .spin {
   animation: spin 1s linear infinite;
 }

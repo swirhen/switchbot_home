@@ -13,6 +13,9 @@
 - `web/src/main.tsx`: ログイン画面、一覧ページ（`#/`）、ハッシュによるページ切り替え。
 - `web/src/layout.tsx`: レイアウトページ（`#/layout`）。機器・シーンのボタンや状態表示をキャンバスに置き、ドラッグで移動・リサイズする。
 - `web/src/common.tsx`: API 呼び出し、型、ヘッダー、状態表示など共通部品。機器タイプごとの操作ボタンは `deviceActions()` で決める。
+- `web/src/schedule.tsx`: スケジュールページ（`#/schedule`）。スケジュールと外出予定の表、追加・編集フォーム。
+- `web/scheduler.py`: スケジュールの判定（日付条件・翌日にまたがる時間・外出予定・祝日は `jpholiday`）と、毎分の実行ループ。
+- `web/schedules.json` / `web/schedule_state.json`: スケジュールと外出予定、最終実行の記録（Git 管理外）。
 - `web/layout.json`: レイアウトページの配置（Git 管理外。画面の編集内容が自動保存される）。
 - `config.json`: SwitchBot のトークン/シークレットと画面のログイン情報（Git 管理外。雛形は `config.example.json`）。環境変数 `SWITCHBOT_TOKEN` / `SWITCHBOT_SECRET` / `SWITCHBOT_HOME_USERNAME` / `SWITCHBOT_HOME_PASSWORD` / `SWITCHBOT_HOME_SECRET` があればそちらを優先する。
 - `web/ir_state.json`: 赤外線リモコンに最後に送ったコマンドの記録（Git 管理外）。
@@ -22,6 +25,7 @@
 - SwitchBot API は 1日 10,000 回まで。機器一覧・シーンは 10 分、状態は 30 秒キャッシュしている。ポーリングを増やすときは回数に注意する。
 - 赤外線リモコンは状態を取得できない。オートメーション（スケジュール等）は API から取得・登録できない。
 - `config.json` の値は表示・コミットしない。
+- スケジューラーは環境変数 `SWITCHBOT_HOME_SCHEDULER=1`（または `config.json` の `scheduler_enabled: true`）のサーバーでだけ動く。本番は systemd 定義で有効にしている。手元で有効にすると本番と二重に実行されるので、確認するときは本番の予定と重ならないようにする。
 
 ## 開発と検証
 

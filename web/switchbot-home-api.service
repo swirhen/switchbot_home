@@ -13,6 +13,8 @@ ExecStart=/home/swirhen/switchbot_home/web/.venv/bin/uvicorn api:app --host 127.
 Restart=on-failure
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1
+# スケジュールの実行は本番だけで行う（手元の開発用サーバーでは動かさない）
+Environment=SWITCHBOT_HOME_SCHEDULER=1
 
 [Install]
 WantedBy=multi-user.target

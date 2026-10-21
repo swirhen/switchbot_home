@@ -7,6 +7,7 @@ import {
 	api, base, deviceActions, errorMessage, executeScene, hasStatus, sendCommand, setAuthToken, supportsOnOff, useToast,
 } from './common'
 import { LayoutPage } from './layout'
+import { SchedulePage } from './schedule'
 import './styles.css'
 
 type Filter = 'all' | 'device' | 'ir'
@@ -248,7 +249,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
 // ルーティングは本番の配置先（サブパス）に依存しないようハッシュで行う
 function currentPage(): Page {
-	return window.location.hash.startsWith('#/layout') ? 'layout' : 'dashboard'
+	if (window.location.hash.startsWith('#/layout')) return 'layout'
+	if (window.location.hash.startsWith('#/schedule')) return 'schedule'
+	return 'dashboard'
 }
 
 function App() {
@@ -288,7 +291,9 @@ function App() {
 	if (sessionError) return <main><p className="error">API に接続できません: {sessionError}</p></main>
 	if (authenticated === null) return <main><p className="muted">読み込み中...</p></main>
 	if (!authenticated) return <Login onLogin={() => setAuthenticated(true)} />
-	return page === 'layout' ? <LayoutPage onLogout={logout} /> : <Dashboard onLogout={logout} />
+	if (page === 'layout') return <LayoutPage onLogout={logout} />
+	if (page === 'schedule') return <SchedulePage onLogout={logout} />
+	return <Dashboard onLogout={logout} />
 }
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: false } } })

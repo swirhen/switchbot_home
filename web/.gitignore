@@ -5,3 +5,5 @@ __pycache__/
 ir_state.json
 *.tsbuildinfo
 layout.json
+schedules.json
+schedule_state.json

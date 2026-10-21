@@ -1,5 +1,6 @@
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager
 import hashlib
 import hmac
 import json
@@ -9,11 +10,24 @@ import threading
 import time
 from typing import Any, Literal
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from switchbot_client import SwitchBotClient, SwitchBotError, load_config
+import scheduler as sched
 
-app = FastAPI(title='SwitchBot Home API')
+
+@asynccontextmanager
+async def lifespan(_app):
+    # 手元の開発用サーバーと本番の両方で動くと二重に実行されるため、明示的に有効にしたサーバーでだけ動かす
+    runner = sched.Scheduler(execute_action) if SCHEDULER_ENABLED else None
+    if runner:
+        runner.start()
+    yield
+    if runner:
+        runner.stop()
+
+
+app = FastAPI(title='SwitchBot Home API', lifespan=lifespan)
 IR_STATE_FILE = Path(__file__).resolve().parent / 'ir_state.json'
 LAYOUT_FILE = Path(__file__).resolve().parent / 'layout.json'
 AUTH_COOKIE = 'switchbot_home_session'
@@ -26,6 +40,7 @@ CONFIG = load_config()
 USERNAME = os.getenv('SWITCHBOT_HOME_USERNAME', CONFIG.get('web_username', ''))
 PASSWORD = os.getenv('SWITCHBOT_HOME_PASSWORD', CONFIG.get('web_password', ''))
 SECRET = os.getenv('SWITCHBOT_HOME_SECRET', CONFIG.get('web_secret', ''))
+SCHEDULER_ENABLED = os.getenv('SWITCHBOT_HOME_SCHEDULER', '1' if CONFIG.get('scheduler_enabled') else '').lower() in ('1', 'true', 'yes')
 
 client = SwitchBotClient.from_env()
 cache_lock = threading.Lock()
@@ -66,6 +81,43 @@ class Widget(BaseModel):
 
 class Layout(BaseModel):
     widgets: list[Widget] = []
+
+
+HM = r'^([01]\d|2[0-3]):[0-5]\d$'
+DATETIME = r'^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$'
+
+
+class ScheduleAction(BaseModel):
+    kind: Literal['scene', 'device']
+    targetId: str
+    command: str | None = None
+
+
+class Schedule(BaseModel):
+    id: str
+    name: str = ''
+    enabled: bool = True
+    dayMode: Literal['everyday', 'weekday', 'holiday', 'days'] = 'everyday'
+    weekdays: list[int] = []
+    start: str = Field(pattern=HM)
+    end: str | None = Field(default=None, pattern=HM)
+    startAction: ScheduleAction | None = None
+    endAction: ScheduleAction | None = None
+
+
+class Outing(BaseModel):
+    id: str
+    name: str = ''
+    enabled: bool = True
+    start: str = Field(pattern=DATETIME)
+    end: str = Field(pattern=DATETIME)
+    allTargets: bool = True
+    targetIds: list[str] = []
+
+
+class ScheduleData(BaseModel):
+    schedules: list[Schedule] = []
+    outings: list[Outing] = []
 
 
 class LoginRequest(BaseModel):
@@ -289,3 +341,41 @@ def update_layout(payload: Layout, _auth=Depends(require_auth)):
     temporary.write_text(json.dumps(layout, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     temporary.replace(LAYOUT_FILE)
     return layout
+
+
+def execute_action(action: dict):
+    if action['kind'] == 'scene':
+        call_switchbot(client.execute_scene, action['targetId'])
+    else:
+        run_command(action['targetId'], CommandRequest(command=action['command'] or 'turnOn'))
+
+
+def schedule_payload():
+    data = sched.load_data()
+    state = sched.load_state()
+    now = sched.now_minute()
+    return {
+        **data,
+        'nextRuns': {s['id']: sched.next_run(s, now, data['outings']) for s in data['schedules']},
+        'lastRuns': state['lastRuns'],
+        'status': {'schedulerEnabled': SCHEDULER_ENABLED, 'now': now.isoformat(timespec='minutes'), 'today': sched.today_info(now)},
+    }
+
+
+@app.get('/api/schedules')
+def get_schedules(_auth=Depends(require_auth)):
+    return schedule_payload()
+
+
+@app.put('/api/schedules')
+def update_schedules(payload: ScheduleData, _auth=Depends(require_auth)):
+    for outing in payload.outings:
+        if outing.end <= outing.start:
+            raise HTTPException(status_code=422, detail=f'外出予定「{outing.name}」の終了日時が開始日時より前です')
+    data = payload.model_dump()
+    # 削除されたスケジュールは外出予定の対象からも外す
+    ids = {s['id'] for s in data['schedules']}
+    for outing in data['outings']:
+        outing['targetIds'] = [i for i in outing['targetIds'] if i in ids]
+    sched.save_data(data)
+    return schedule_payload()

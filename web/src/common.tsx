@@ -23,7 +23,7 @@ export type Scene = { id: string; name: string }
 
 export type Action = { label: string; command: string; parameter?: unknown; confirm?: string }
 
-export type Page = 'dashboard' | 'layout'
+export type Page = 'dashboard' | 'layout' | 'schedule'
 
 export const base = `${import.meta.env.BASE_URL}api`
 const AUTH_TOKEN_KEY = 'switchbot_home_token'
@@ -206,6 +206,7 @@ export function Header({ page, onLogout, children }: { page: Page; onLogout: () 
 				<nav>
 					<a href="#/" className={page === 'dashboard' ? 'active' : ''}>一覧</a>
 					<a href="#/layout" className={page === 'layout' ? 'active' : ''}>レイアウト</a>
+					<a href="#/schedule" className={page === 'schedule' ? 'active' : ''}>スケジュール</a>
 				</nav>
 			</div>
 			<div className="header-actions">
