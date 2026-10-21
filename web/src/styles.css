@@ -233,6 +233,54 @@ nav a.active {
   color: var(--green);
   border-color: var(--green);
 }
+nav .nav-button {
+  font-size: 16px;
+  padding: 6px 12px;
+  color: var(--muted);
+  background: transparent;
+  border-color: transparent;
+}
+nav .nav-button.active {
+  color: var(--green);
+  border-color: var(--green);
+}
+.popup {
+  position: relative;
+  display: inline-flex;
+}
+.popup-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  min-width: 200px;
+  max-height: 60vh;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: #111;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px #000c;
+}
+.popup-menu button {
+  width: 100%;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  text-align: left;
+  white-space: nowrap;
+}
+.popup-menu button:hover:not(:disabled) {
+  background: #1d1d1d;
+}
+.popup-menu button.active {
+  color: var(--green);
+}
+button.danger {
+  color: var(--red);
+}
 select {
   font: inherit;
   font-size: 14px;

@@ -11,12 +11,12 @@
 - `switchbot_client.py`: SwitchBot API の署名生成と呼び出し、1日の呼び出し回数カウント。
 - `web/api.py`: ログイン認証、機器一覧・状態（キャッシュ付き）、コマンド送信、一括操作、シーン実行。
 - `web/src/main.tsx`: ログイン画面、一覧ページ（`#/`）、ハッシュによるページ切り替え。
-- `web/src/layout.tsx`: レイアウトページ（`#/layout`）。機器・シーンのボタンや状態表示をキャンバスに置き、ドラッグで移動・リサイズする。
+- `web/src/layout.tsx`: レイアウトページ（`#/layout/<名前 または id>`、複数持てる。名前は重複不可）。機器・シーンのボタンや状態表示をキャンバスに置き、ドラッグで移動・リサイズする。
 - `web/src/common.tsx`: API 呼び出し、型、ヘッダー、状態表示など共通部品。機器タイプごとの操作ボタンは `deviceActions()` で決める。
 - `web/src/schedule.tsx`: スケジュールページ（`#/schedule`）。スケジュールと外出予定の表、追加・編集フォーム。
 - `web/scheduler.py`: スケジュールの判定（日付条件・翌日にまたがる時間・外出予定・祝日は `jpholiday`）と、毎分の実行ループ。
 - `web/schedules.json` / `web/schedule_state.json`: スケジュールと外出予定、最終実行の記録（Git 管理外）。
-- `web/layout.json`: レイアウトページの配置（Git 管理外。画面の編集内容が自動保存される）。
+- `web/layout.json`: レイアウトページの配置（`{"layouts": [{"id", "name", "widgets"}]}`、Git 管理外。画面の編集内容が自動保存される。旧形式の `{"widgets"}` は 1 つ目のレイアウトとして読む）。
 - `config.json`: SwitchBot のトークン/シークレットと画面のログイン情報（Git 管理外。雛形は `config.example.json`）。環境変数 `SWITCHBOT_TOKEN` / `SWITCHBOT_SECRET` / `SWITCHBOT_HOME_USERNAME` / `SWITCHBOT_HOME_PASSWORD` / `SWITCHBOT_HOME_SECRET` があればそちらを優先する。
 - `web/ir_state.json`: 赤外線リモコンに最後に送ったコマンドの記録（Git 管理外）。
 

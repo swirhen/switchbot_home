@@ -5,6 +5,8 @@ import { Device, DevicesResponse, Header, Scene, UnauthorizedError, api, deviceA
 
 type DayMode = 'everyday' | 'weekday' | 'holiday' | 'days'
 
+type ExcludeMode = 'none' | 'weekday' | 'holiday' | 'days'
+
 type ScheduleAction = { kind: 'scene' | 'device'; targetId: string; command?: string | null }
 
 type Schedule = {
@@ -13,6 +15,9 @@ type Schedule = {
 	enabled: boolean
 	dayMode: DayMode
 	weekdays: number[]
+	// 以前に保存したスケジュールには無いので省略可（無ければ除外なし）
+	excludeMode?: ExcludeMode
+	excludeWeekdays?: number[]
 	start: string
 	end: string | null
 	startAction: ScheduleAction | null
@@ -47,6 +52,7 @@ type SchedulesResponse = ScheduleData & {
 
 const WEEKDAYS = ['月', '火', '水', '木', '金', '土', '日']
 const DAY_MODES: [DayMode, string][] = [['everyday', '毎日'], ['weekday', '平日'], ['holiday', '休日（土日祝）'], ['days', '曜日指定']]
+const EXCLUDE_MODES: [ExcludeMode, string][] = [['none', 'なし'], ['weekday', '平日'], ['holiday', '休日（土日祝）'], ['days', '曜日指定']]
 const RESULT_LABELS: Record<LastRun['result'], string> = { ok: '成功', skipped: 'スキップ', error: 'エラー' }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -64,9 +70,32 @@ function formatDateTime(value: string) {
 	return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAYS[(d.getDay() + 6) % 7]}) ${d.getHours()}:${pad(d.getMinutes())}`
 }
 
+function modeLabel(mode: DayMode | ExcludeMode, weekdays: number[]) {
+	if (mode !== 'days') return [...DAY_MODES, ...EXCLUDE_MODES].find(([key]) => key === mode)?.[1] ?? ''
+	return [...weekdays].sort().map(i => WEEKDAYS[i]).join('・') || '（曜日未選択）'
+}
+
 function dayLabel(s: Schedule) {
-	if (s.dayMode !== 'days') return DAY_MODES.find(([key]) => key === s.dayMode)?.[1] ?? ''
-	return [...s.weekdays].sort().map(i => WEEKDAYS[i]).join('・') || '（曜日未選択）'
+	const base = modeLabel(s.dayMode, s.weekdays)
+	const exclude = s.excludeMode ?? 'none'
+	if (exclude === 'none') return base
+	return `${base}（${modeLabel(exclude, s.excludeWeekdays ?? [])}を除く）`
+}
+
+// サーバーの scheduler.mode_matches と同じ判定（weekday: 0=月, holiday: 土日祝）
+function modeMatches(mode: DayMode | ExcludeMode, weekdays: number[], weekday: number, holiday: boolean) {
+	if (mode === 'weekday') return !holiday
+	if (mode === 'holiday') return holiday
+	if (mode === 'days') return weekdays.includes(weekday)
+	return mode === 'everyday'
+}
+
+// 日付条件と除外条件の組み合わせで、実行される日があるか（月〜金は祝日の場合も考える）
+function hasRunDay(s: Schedule) {
+	return WEEKDAYS.some((_, weekday) => [false, true].some(holiday => {
+		if (weekday >= 5 && !holiday) return false
+		return modeMatches(s.dayMode, s.weekdays, weekday, holiday) && !modeMatches(s.excludeMode ?? 'none', s.excludeWeekdays ?? [], weekday, holiday)
+	}))
 }
 
 function timeLabel(s: Schedule) {
@@ -135,18 +164,20 @@ function ScheduleForm({ initial, isNew, devices, scenes, onSave, onClose }: {
 	onSave: (s: Schedule) => void
 	onClose: () => void
 }) {
-	const [draft, setDraft] = React.useState(initial)
+	const [draft, setDraft] = React.useState<Schedule>({ excludeMode: 'none', excludeWeekdays: [], ...initial })
 	const [error, setError] = React.useState('')
 	const set = (patch: Partial<Schedule>) => setDraft(d => ({ ...d, ...patch }))
+	const excludeWeekdays = draft.excludeWeekdays ?? []
 
-	const toggleWeekday = (i: number) =>
-		set({ weekdays: draft.weekdays.includes(i) ? draft.weekdays.filter(w => w !== i) : [...draft.weekdays, i].sort() })
+	const toggle = (list: number[], i: number) => (list.includes(i) ? list.filter(w => w !== i) : [...list, i].sort())
 
 	const submit = (e: React.FormEvent) => {
 		e.preventDefault()
 		if (!draft.start) return setError('開始時刻を入力してください')
 		if (!draft.startAction) return setError('開始時の操作を選んでください')
 		if (draft.dayMode === 'days' && draft.weekdays.length === 0) return setError('曜日を1つ以上選んでください')
+		if (draft.excludeMode === 'days' && excludeWeekdays.length === 0) return setError('除外する曜日を1つ以上選んでください')
+		if (!hasRunDay(draft)) return setError('この日付条件と除外の組み合わせでは、実行される日がありません')
 		if (draft.end && !draft.endAction) return setError('終了時刻を入れた場合は、終了時の操作も選んでください')
 		if (draft.end === draft.start) return setError('開始時刻と終了時刻が同じです')
 		onSave({ ...draft, name: draft.name.trim(), end: draft.end || null, endAction: draft.end ? draft.endAction : null })
@@ -166,7 +197,22 @@ function ScheduleForm({ initial, isNew, devices, scenes, onSave, onClose }: {
 					{draft.dayMode === 'days' && (
 						<div className="radios">
 							{WEEKDAYS.map((w, i) => (
-								<label key={w}><input type="checkbox" checked={draft.weekdays.includes(i)} onChange={() => toggleWeekday(i)} />{w}</label>
+								<label key={w}><input type="checkbox" checked={draft.weekdays.includes(i)} onChange={() => set({ weekdays: toggle(draft.weekdays, i) })} />{w}</label>
+							))}
+						</div>
+					)}
+				</fieldset>
+				<fieldset>
+					<legend>除外する日</legend>
+					<div className="radios">
+						{EXCLUDE_MODES.map(([key, label]) => (
+							<label key={key}><input type="radio" checked={draft.excludeMode === key} onChange={() => set({ excludeMode: key })} />{label}</label>
+						))}
+					</div>
+					{draft.excludeMode === 'days' && (
+						<div className="radios">
+							{WEEKDAYS.map((w, i) => (
+								<label key={w}><input type="checkbox" checked={excludeWeekdays.includes(i)} onChange={() => set({ excludeWeekdays: toggle(excludeWeekdays, i) })} />{w}</label>
 							))}
 						</div>
 					)}
@@ -340,7 +386,7 @@ export function SchedulePage({ onLogout }: { onLogout: () => void }) {
 	}
 
 	const newSchedule = (): Schedule => ({
-		id: crypto.randomUUID(), name: '', enabled: true, dayMode: 'everyday', weekdays: [], start: '07:00', end: null, startAction: null, endAction: null,
+		id: crypto.randomUUID(), name: '', enabled: true, dayMode: 'everyday', weekdays: [], excludeMode: 'none', excludeWeekdays: [], start: '07:00', end: null, startAction: null, endAction: null,
 	})
 
 	const newOuting = (): Outing => {

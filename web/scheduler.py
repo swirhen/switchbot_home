@@ -62,15 +62,21 @@ def holiday_name(day: date) -> str | None:
     return jpholiday.is_holiday_name(day)
 
 
-def day_matches(schedule: dict, day: date) -> bool:
-    mode = schedule.get('dayMode', 'everyday')
+def mode_matches(mode: str, weekdays: list[int], day: date) -> bool:
     if mode == 'weekday':
         return not is_holiday(day)
     if mode == 'holiday':
         return is_holiday(day)
     if mode == 'days':
-        return day.weekday() in schedule.get('weekdays', [])
-    return True
+        return day.weekday() in weekdays
+    return mode == 'everyday'
+
+
+def day_matches(schedule: dict, day: date) -> bool:
+    # 日付条件に当てはまり、除外条件（平日・休日・曜日指定）に当てはまらない日に実行する
+    if not mode_matches(schedule.get('dayMode', 'everyday'), schedule.get('weekdays', []), day):
+        return False
+    return not mode_matches(schedule.get('excludeMode', 'none'), schedule.get('excludeWeekdays', []), day)
 
 
 def parse_hm(value: str) -> dtime:

@@ -198,14 +198,85 @@ export function useToast() {
 	return { showToast, toastElement: element }
 }
 
-export function Header({ page, onLogout, children }: { page: Page; onLogout: () => void; children?: React.ReactNode }) {
+export function useHash() {
+	const [hash, setHash] = React.useState(window.location.hash)
+	React.useEffect(() => {
+		const onHashChange = () => setHash(window.location.hash)
+		window.addEventListener('hashchange', onHashChange)
+		return () => window.removeEventListener('hashchange', onHashChange)
+	}, [])
+	return hash
+}
+
+export type MenuItem = { key: string; label: React.ReactNode; onSelect: () => void; active?: boolean; disabled?: boolean }
+
+// ボタンの真下に開く選択メニュー。外側をクリックするか Esc で閉じる
+export function PopupMenu({ label, items, className = '', disabled = false }: {
+	label: React.ReactNode
+	items: MenuItem[]
+	className?: string
+	disabled?: boolean
+}) {
+	const [open, setOpen] = React.useState(false)
+	const ref = React.useRef<HTMLSpanElement>(null)
+	React.useEffect(() => {
+		if (!open) return
+		const onPointerDown = (e: PointerEvent) => {
+			if (!ref.current?.contains(e.target as Node)) setOpen(false)
+		}
+		const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+		document.addEventListener('pointerdown', onPointerDown)
+		window.addEventListener('keydown', onKey)
+		return () => {
+			document.removeEventListener('pointerdown', onPointerDown)
+			window.removeEventListener('keydown', onKey)
+		}
+	}, [open])
+	return (
+		<span className="popup" ref={ref}>
+			<button type="button" className={className} onClick={() => setOpen(!open)} disabled={disabled} aria-expanded={open}>
+				{label}
+			</button>
+			{open && (
+				<ul className="popup-menu" role="menu">
+					{items.map(item => (
+						<li key={item.key}>
+							<button
+								type="button"
+								role="menuitem"
+								className={item.active ? 'active' : ''}
+								disabled={item.disabled}
+								onClick={() => {
+									setOpen(false)
+									item.onSelect()
+								}}
+							>
+								{item.label}
+							</button>
+						</li>
+					))}
+				</ul>
+			)}
+		</span>
+	)
+}
+
+export function Header({ page, onLogout, layoutMenu, children }: {
+	page: Page
+	onLogout: () => void
+	// レイアウトページを開いているときは「レイアウト」を押すと切り替えメニューを出す
+	layoutMenu?: MenuItem[]
+	children?: React.ReactNode
+}) {
 	return (
 		<header>
 			<div className="title-row">
 				<h1>SwitchBot Home</h1>
 				<nav>
 					<a href="#/" className={page === 'dashboard' ? 'active' : ''}>一覧</a>
-					<a href="#/layout" className={page === 'layout' ? 'active' : ''}>レイアウト</a>
+					{layoutMenu
+						? <PopupMenu label="レイアウト" className="nav-button active" items={layoutMenu} />
+						: <a href="#/layout" className={page === 'layout' ? 'active' : ''}>レイアウト</a>}
 					<a href="#/schedule" className={page === 'schedule' ? 'active' : ''}>スケジュール</a>
 				</nav>
 			</div>

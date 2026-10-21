@@ -1,9 +1,9 @@
 import React from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Pencil, Play, Plus, RefreshCw, Trash2, Type } from 'lucide-react'
+import { Check, Copy, Pencil, Play, Plus, RefreshCw, Trash2, Type } from 'lucide-react'
 import {
-	Device, DevicesResponse, Header, Scene, StatusesResponse, StatusView, UnauthorizedError,
-	api, deviceActions, errorMessage, executeScene, hasStatus, sendCommand, useToast,
+	Device, DevicesResponse, Header, PopupMenu, Scene, StatusesResponse, StatusView, UnauthorizedError,
+	api, deviceActions, errorMessage, executeScene, hasStatus, sendCommand, useHash, useToast,
 } from './common'
 
 type WidgetKind = 'status' | 'action' | 'scene' | 'group'
@@ -65,11 +65,34 @@ function contentOptions(target: Target): { key: string; label: string }[] {
 	return options
 }
 
-export function LayoutPage({ onLogout }: { onLogout: () => void }) {
+type LayoutDoc = { id: string; name: string; widgets: Widget[] }
+
+type LayoutsResponse = { layouts: LayoutDoc[] }
+
+const LAST_LAYOUT_KEY = 'switchbot_home_last_layout'
+
+const layoutLabel = (layout: LayoutDoc, index: number) => layout.name || `レイアウト ${index + 1}`
+
+// URL では名前があれば名前、無ければ id で指す
+const layoutPath = (layout: LayoutDoc) => `#/layout/${encodeURIComponent(layout.name || layout.id)}`
+
+// 他のレイアウトから写すときは、ウィジェットの id を振り直す
+const cloneWidgets = (items: Widget[]) => items.map(w => ({ ...w, id: crypto.randomUUID() }))
+
+function LayoutEditor({ layout, layouts, onLogout, onSelect, onCreate, onDelete, onRename }: {
+	layout: LayoutDoc
+	layouts: LayoutDoc[]
+	onLogout: () => void
+	onSelect: (id: string) => void
+	onCreate: () => void
+	onDelete: (id: string) => void
+	onRename: (id: string, name: string) => Promise<string | null>
+}) {
 	const queryClient = useQueryClient()
 	const { showToast, toastElement } = useToast()
-	const [widgets, setWidgets] = React.useState<Widget[]>([])
-	const [editing, setEditing] = React.useState(false)
+	const [widgets, setWidgets] = React.useState<Widget[]>(layout.widgets)
+	// 何も置いていなければ最初から編集モードにする
+	const [editing, setEditing] = React.useState(layout.widgets.length === 0)
 	const [activeId, setActiveId] = React.useState<string | null>(null)
 	const [busy, setBusy] = React.useState<string | null>(null)
 	const [refreshing, setRefreshing] = React.useState(false)
@@ -79,9 +102,8 @@ export function LayoutPage({ onLogout }: { onLogout: () => void }) {
 	const [canvasWidth, setCanvasWidth] = React.useState(0)
 	const canvasRef = React.useRef<HTMLDivElement>(null)
 	const drag = React.useRef<Drag | null>(null)
-	const loaded = React.useRef(false)
 	const pendingSave = React.useRef(false)
-	const latestWidgets = React.useRef<Widget[]>([])
+	const latestWidgets = React.useRef<Widget[]>(layout.widgets)
 
 	const handleError = (err: unknown) => {
 		if (err instanceof UnauthorizedError) onLogout()
@@ -90,7 +112,6 @@ export function LayoutPage({ onLogout }: { onLogout: () => void }) {
 
 	const devicesQuery = useQuery({ queryKey: ['devices'], queryFn: () => api<DevicesResponse>('/devices'), retry: false })
 	const scenesQuery = useQuery({ queryKey: ['scenes'], queryFn: () => api<{ scenes: Scene[] }>('/scenes'), retry: false })
-	const layoutQuery = useQuery({ queryKey: ['layout'], queryFn: () => api<{ widgets: Widget[] }>('/layout'), retry: false })
 
 	const devices = React.useMemo(() => new Map((devicesQuery.data?.devices ?? []).map(d => [d.id, d])), [devicesQuery.data])
 	const scenes = React.useMemo(() => new Map((scenesQuery.data?.scenes ?? []).map(s => [s.id, s])), [scenesQuery.data])
@@ -111,32 +132,25 @@ export function LayoutPage({ onLogout }: { onLogout: () => void }) {
 	const statuses = statusesQuery.data?.statuses ?? {}
 
 	React.useEffect(() => {
-		for (const q of [devicesQuery, scenesQuery, layoutQuery, statusesQuery]) if (q.error) handleError(q.error)
+		for (const q of [devicesQuery, scenesQuery, statusesQuery]) if (q.error) handleError(q.error)
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [devicesQuery.error, scenesQuery.error, layoutQuery.error, statusesQuery.error])
-
-	React.useEffect(() => {
-		if (loaded.current || !layoutQuery.data) return
-		loaded.current = true
-		setWidgets(layoutQuery.data.widgets)
-		latestWidgets.current = layoutQuery.data.widgets
-		// 何も置いていなければ最初から編集モードにする
-		if (layoutQuery.data.widgets.length === 0) setEditing(true)
-	}, [layoutQuery.data])
+	}, [devicesQuery.error, scenesQuery.error, statusesQuery.error])
 
 	const save = React.useCallback(async (items: Widget[]) => {
 		pendingSave.current = false
 		setSaveState('saving')
 		try {
-			await api('/layout', { method: 'PUT', body: JSON.stringify({ widgets: items }) })
-			queryClient.setQueryData(['layout'], { widgets: items })
+			await api(`/layouts/${layout.id}`, { method: 'PUT', body: JSON.stringify({ widgets: items }) })
+			queryClient.setQueryData<LayoutsResponse>(['layouts'], old => old && {
+				layouts: old.layouts.map(l => (l.id === layout.id ? { ...l, widgets: items } : l)),
+			})
 			setSaveState('saved')
 		} catch (err) {
 			setSaveState('error')
 			handleError(err)
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [queryClient])
+	}, [queryClient, layout.id])
 
 	// 変更は少し待ってまとめて保存する（ドラッグ中に毎回保存しないため）
 	React.useEffect(() => {
@@ -210,6 +224,27 @@ export function LayoutPage({ onLogout }: { onLogout: () => void }) {
 		setActiveId(widget.id)
 	}
 
+	const copyFrom = (source: LayoutDoc, index: number) => {
+		if (widgets.length && !window.confirm(`今の配置を消して、${layoutLabel(source, index)} の内容に置き換えますか？`)) return
+		updateWidgets(() => cloneWidgets(source.widgets))
+		setActiveId(null)
+		showToast(`${layoutLabel(source, index)} からコピーしました`)
+	}
+
+	const deleteLayout = () => {
+		if (!window.confirm(`${layoutLabel(layout, currentIndex)} を削除しますか？（元に戻せません）`)) return
+		pendingSave.current = false
+		onDelete(layout.id)
+	}
+
+	const renameLayout = async () => {
+		const name = window.prompt('レイアウトの名前（URL の #/layout/名前 で開けます。空にすると番号表示に戻ります）', layout.name)
+		if (name === null) return
+		const error = await onRename(layout.id, name.trim())
+		if (error) showToast(error, true)
+		else showToast(name.trim() ? `名前を「${name.trim()}」にしました` : '名前を消しました')
+	}
+
 	const removeWidget = (id: string) => updateWidgets(items => items.filter(w => w.id !== id))
 
 	const renameWidget = (widget: Widget) => {
@@ -269,6 +304,8 @@ export function LayoutPage({ onLogout }: { onLogout: () => void }) {
 		}
 	}
 
+	const currentIndex = Math.max(0, layouts.findIndex(l => l.id === layout.id))
+
 	const statusWidgetCount = new Set(widgets.filter(w => w.kind === 'status').map(w => w.targetId)).size
 
 	const refreshAll = async () => {
@@ -318,7 +355,15 @@ export function LayoutPage({ onLogout }: { onLogout: () => void }) {
 
 	return (
 		<main className="layout-page">
-			<Header page="layout" onLogout={onLogout}>
+			<Header
+				page="layout"
+				onLogout={onLogout}
+				layoutMenu={[
+					{ key: 'new', label: <><Plus size={14} /> 新規レイアウト</>, onSelect: onCreate },
+					...layouts.map((l, i) => ({ key: l.id, label: layoutLabel(l, i), active: l.id === layout.id, onSelect: () => onSelect(l.id) })),
+				]}
+			>
+				<small>{layoutLabel(layout, currentIndex)}</small>
 				<small className={saveState === 'error' ? 'error' : ''}>
 					{saveState === 'saving' ? '保存中...' : saveState === 'error' ? '保存に失敗しました' : '保存済み'}
 				</small>
@@ -350,6 +395,15 @@ export function LayoutPage({ onLogout }: { onLogout: () => void }) {
 						{contents.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
 					</select>
 					<button onClick={addWidget} disabled={!contentKey}><Plus size={16} /> 追加</button>
+					<PopupMenu
+						label={<><Copy size={16} /> 別のレイアウトからコピー</>}
+						disabled={layouts.length < 2}
+						items={layouts.map((l, i) => ({ key: l.id, label: `${layoutLabel(l, i)}（${l.widgets.length}個）`, disabled: l.id === layout.id, onSelect: () => copyFrom(l, i) }))}
+					/>
+					<button className="ghost" onClick={renameLayout}><Type size={16} /> 名前を変更</button>
+					{layouts.length > 1 && (
+						<button className="ghost danger" onClick={deleteLayout}><Trash2 size={16} /> このレイアウトを削除</button>
+					)}
 				</div>
 			)}
 
@@ -360,7 +414,7 @@ export function LayoutPage({ onLogout }: { onLogout: () => void }) {
 					style={{ height: canvasHeight }}
 					onPointerDown={() => setActiveId(null)}
 				>
-					{widgets.length === 0 && layoutQuery.isSuccess && (
+					{widgets.length === 0 && (
 						<p className="canvas-empty muted">上のプルダウンから機器やシーンを選んで「追加」してください。</p>
 					)}
 					{/* グループは常に他のウィジェットより奥に描く */}
@@ -418,4 +472,96 @@ export function LayoutPage({ onLogout }: { onLogout: () => void }) {
 			{toastElement}
 		</main>
 	)
+}
+
+export function LayoutPage({ onLogout }: { onLogout: () => void }) {
+	const queryClient = useQueryClient()
+	const hash = useHash()
+	const layoutsQuery = useQuery({ queryKey: ['layouts'], queryFn: () => api<LayoutsResponse>('/layouts'), retry: false })
+
+	React.useEffect(() => {
+		if (layoutsQuery.error instanceof UnauthorizedError) onLogout()
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [layoutsQuery.error])
+
+	const layouts = layoutsQuery.data?.layouts ?? []
+	const requested = hash.match(/^#\/layout\/(.+)$/)?.[1]
+	let requestedKey: string | undefined
+	try {
+		requestedKey = requested && decodeURIComponent(requested)
+	} catch {
+		requestedKey = requested
+	}
+	let lastId: string | null = null
+	try {
+		lastId = localStorage.getItem(LAST_LAYOUT_KEY)
+	} catch {
+		// localStorage error
+	}
+	// URL の指定（名前 → id） → 最後に開いたレイアウト → 先頭の順に開く
+	const current = (requestedKey && (layouts.find(l => l.name === requestedKey) ?? layouts.find(l => l.id === requestedKey)))
+		|| layouts.find(l => l.id === lastId) || layouts[0]
+
+	React.useEffect(() => {
+		if (!current) return
+		try {
+			localStorage.setItem(LAST_LAYOUT_KEY, current.id)
+		} catch {
+			// localStorage error
+		}
+	}, [current?.id])
+
+	const handleError = (err: unknown) => {
+		if (err instanceof UnauthorizedError) onLogout()
+		else window.alert(errorMessage(err))
+	}
+
+	const select = (id: string, list = layouts) => {
+		const target = list.find(l => l.id === id)
+		window.location.hash = target ? layoutPath(target) : `#/layout/${id}`
+	}
+
+	// 失敗したときはエラーメッセージを返す
+	const rename = async (id: string, name: string) => {
+		try {
+			await api(`/layouts/${id}`, { method: 'PUT', body: JSON.stringify({ name }) })
+		} catch (err) {
+			if (err instanceof UnauthorizedError) onLogout()
+			return errorMessage(err)
+		}
+		const next = layouts.map(l => (l.id === id ? { ...l, name } : l))
+		queryClient.setQueryData<LayoutsResponse>(['layouts'], { layouts: next })
+		select(id, next)
+		return null
+	}
+
+	const create = async () => {
+		const id = crypto.randomUUID()
+		try {
+			await api(`/layouts/${id}`, { method: 'PUT', body: JSON.stringify({ widgets: [] }) })
+			const next = [...layouts, { id, name: '', widgets: [] }]
+			queryClient.setQueryData<LayoutsResponse>(['layouts'], { layouts: next })
+			select(id, next)
+		} catch (err) {
+			handleError(err)
+		}
+	}
+
+	const remove = async (id: string) => {
+		try {
+			await api(`/layouts/${id}`, { method: 'DELETE' })
+			const rest = layouts.filter(l => l.id !== id)
+			queryClient.setQueryData<LayoutsResponse>(['layouts'], { layouts: rest })
+			if (rest[0]) select(rest[0].id, rest)
+		} catch (err) {
+			handleError(err)
+		}
+	}
+
+	if (layoutsQuery.error && !(layoutsQuery.error instanceof UnauthorizedError)) {
+		return <main><p className="error">{errorMessage(layoutsQuery.error)}</p></main>
+	}
+	if (!current) return <main><p className="muted">読み込み中...</p></main>
+	// レイアウトを切り替えたら編集中の状態を作り直す
+	return <LayoutEditor key={current.id} layout={current} layouts={layouts} onLogout={onLogout} onSelect={select} onCreate={create} onDelete={remove} onRename={rename} />
 }

@@ -83,6 +83,12 @@ class Layout(BaseModel):
     widgets: list[Widget] = []
 
 
+class LayoutUpdate(BaseModel):
+    # 送られた項目だけ更新する（配置の自動保存と名前の変更が互いを上書きしないように）
+    name: str | None = Field(default=None, max_length=40)
+    widgets: list[Widget] | None = None
+
+
 HM = r'^([01]\d|2[0-3]):[0-5]\d$'
 DATETIME = r'^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$'
 
@@ -99,6 +105,8 @@ class Schedule(BaseModel):
     enabled: bool = True
     dayMode: Literal['everyday', 'weekday', 'holiday', 'days'] = 'everyday'
     weekdays: list[int] = []
+    excludeMode: Literal['none', 'weekday', 'holiday', 'days'] = 'none'
+    excludeWeekdays: list[int] = []
     start: str = Field(pattern=HM)
     end: str | None = Field(default=None, pattern=HM)
     startAction: ScheduleAction | None = None
@@ -325,22 +333,63 @@ def execute_scene(scene_id: str, _auth=Depends(require_auth)):
     return {'ok': True}
 
 
-@app.get('/api/layout')
-def get_layout(_auth=Depends(require_auth)):
+layout_lock = threading.Lock()
+
+
+def load_layouts() -> list[dict]:
     try:
-        layout = json.loads(LAYOUT_FILE.read_text(encoding='utf-8'))
+        data = json.loads(LAYOUT_FILE.read_text(encoding='utf-8'))
     except (OSError, json.JSONDecodeError):
-        layout = {}
-    return Layout(**layout).model_dump()
+        data = {}
+    # 1つだけ持っていたころの形式（{"widgets": [...]}）は、1つ目のレイアウトとして読む
+    if 'layouts' not in data:
+        return [{'id': 'default', 'name': '', 'widgets': data.get('widgets', [])}]
+    return data['layouts']
 
 
-@app.put('/api/layout')
-def update_layout(payload: Layout, _auth=Depends(require_auth)):
-    layout = payload.model_dump()
+def save_layouts(layouts: list[dict]):
     temporary = LAYOUT_FILE.with_suffix('.json.tmp')
-    temporary.write_text(json.dumps(layout, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    temporary.write_text(json.dumps({'layouts': layouts}, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     temporary.replace(LAYOUT_FILE)
-    return layout
+
+
+@app.get('/api/layouts')
+def get_layouts(_auth=Depends(require_auth)):
+    layouts = load_layouts() or [{'id': 'default', 'widgets': []}]
+    return {'layouts': [{'id': l['id'], 'name': l.get('name', ''), **Layout(widgets=l.get('widgets', [])).model_dump()} for l in layouts]}
+
+
+@app.put('/api/layouts/{layout_id}')
+def update_layout(layout_id: str, payload: LayoutUpdate, _auth=Depends(require_auth)):
+    with layout_lock:
+        layouts = load_layouts()
+        layout = next((l for l in layouts if l['id'] == layout_id), None)
+        if layout is None:
+            layout = {'id': layout_id, 'name': '', 'widgets': []}
+            layouts.append(layout)
+        if payload.name is not None:
+            name = payload.name.strip()
+            # 名前は URL（#/layout/名前）で使うので重複させない
+            if name and any(l.get('name') == name for l in layouts if l['id'] != layout_id):
+                raise HTTPException(status_code=422, detail=f'「{name}」という名前のレイアウトは既にあります')
+            layout['name'] = name
+        if payload.widgets is not None:
+            layout['widgets'] = [w.model_dump() for w in payload.widgets]
+        save_layouts(layouts)
+    return {'id': layout_id, 'name': layout.get('name', ''), 'widgets': layout.get('widgets', [])}
+
+
+@app.delete('/api/layouts/{layout_id}')
+def delete_layout(layout_id: str, _auth=Depends(require_auth)):
+    with layout_lock:
+        layouts = load_layouts()
+        rest = [l for l in layouts if l['id'] != layout_id]
+        if len(rest) == len(layouts):
+            raise HTTPException(status_code=404, detail='レイアウトが見つかりません')
+        if not rest:
+            raise HTTPException(status_code=422, detail='最後のレイアウトは削除できません')
+        save_layouts(rest)
+    return {'ok': True}
 
 
 def execute_action(action: dict):
