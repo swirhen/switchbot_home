@@ -3,7 +3,7 @@
 ## プロジェクト概要
 
 - SwitchBot API v1.1 を使い、アカウントに登録された機器の状態確認・一括操作・シーン実行を行う Web アプリ。
-- 構成は FastAPI（`web/api.py`）+ React/Vite（`web/src/`）。本番配置先は未定。
+- 構成は FastAPI（`web/api.py`）+ React/Vite（`web/src/`）。
 - API 仕様の一次情報: https://github.com/OpenWonderLabs/SwitchBotAPI （機器別の詳細は `devices/<カテゴリ>/*.md`）
 
 ## 主なファイル
