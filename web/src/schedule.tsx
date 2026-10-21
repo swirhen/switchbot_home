@@ -57,6 +57,15 @@ const RESULT_LABELS: Record<LastRun['result'], string> = { ok: '成功', skipped
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
+// 日時欄はどこをクリックしてもカレンダーを開く（showPicker に未対応のブラウザでは通常の入力のまま）
+function openPicker(e: React.MouseEvent<HTMLInputElement>) {
+	try {
+		e.currentTarget.showPicker?.()
+	} catch {
+		// 開けない状況（ユーザー操作外など）では何もしない
+	}
+}
+
 function toLocalInput(d: Date) {
 	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
@@ -275,9 +284,9 @@ function OutingForm({ initial, isNew, schedules, onSave, onClose }: {
 				<fieldset>
 					<legend>期間</legend>
 					<div className="time-row">
-						<label>開始<input type="datetime-local" value={draft.start} onChange={e => set({ start: e.target.value })} required /></label>
+						<label>開始<input type="datetime-local" value={draft.start} onClick={openPicker} onChange={e => set({ start: e.target.value })} required /></label>
 						<span>–</span>
-						<label>終了<input type="datetime-local" value={draft.end} onChange={e => set({ end: e.target.value })} required /></label>
+						<label>終了<input type="datetime-local" value={draft.end} onClick={openPicker} onChange={e => set({ end: e.target.value })} required /></label>
 					</div>
 				</fieldset>
 				<fieldset>

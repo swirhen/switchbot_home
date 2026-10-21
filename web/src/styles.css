@@ -1,6 +1,8 @@
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono&family=Space+Grotesk:wght@400;600;700&display=swap");
 
 :root {
+  /* 日付・時刻入力のカレンダーアイコンやポップアップを暗い背景向けに表示させる */
+  color-scheme: dark;
   font-family: "Space Grotesk", sans-serif;
   color: #fff;
   background: #000;
@@ -96,6 +98,14 @@ input {
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 10px 12px;
+}
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
+  cursor: pointer;
+}
+input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
 }
 input[type="checkbox"] {
   width: 18px;
