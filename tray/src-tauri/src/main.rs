@@ -4,7 +4,7 @@
 //! SwitchBot Home をタスクトレイから開くアプリ。
 //! 窓は本番の Web アプリ（コンパクト表示）を直接開くだけで、画面や処理は持たない。
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -20,12 +20,16 @@ const DEFAULT_BASE_URL: &str = "https://swirhen.tv/switchbot_home/";
 const WINDOW_LABEL: &str = "main";
 // 窓の外（トレイアイコンを含む）をクリックして隠れた直後のクリックは、開き直さない
 const REOPEN_GUARD: Duration = Duration::from_millis(300);
+// フォーカスが外れた後、他のウインドウが前面に来たかを調べる間隔
+const FOREGROUND_POLL: Duration = Duration::from_millis(50);
 
 #[derive(Default)]
 struct TrayState {
     hidden_at: Mutex<Option<Instant>>,
     // トレイアイコンの位置が分かってから、トレイ基準で窓を置く
     tray_known: AtomicBool,
+    // フォーカスが変わるたびに増やし、古い監視を止める
+    focus_generation: AtomicU64,
 }
 
 fn base_url() -> String {
@@ -41,6 +45,43 @@ fn hide(app: &AppHandle) {
         let _ = window.hide();
         *app.state::<TrayState>().hidden_at.lock().unwrap() = Some(Instant::now());
     }
+}
+
+/// 窓が前面（アクティブ）か。WebView のフォーカスとは別に、窓そのものを見る
+#[cfg(windows)]
+fn is_foreground(window: &WebviewWindow) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
+    let Ok(hwnd) = window.hwnd() else { return false };
+    unsafe { GetForegroundWindow() as isize == hwnd.0 as isize }
+}
+
+#[cfg(not(windows))]
+fn is_foreground(window: &WebviewWindow) -> bool {
+    window.is_focused().unwrap_or(false)
+}
+
+/// フォーカスが外れたら、他のウインドウが前面に来た時点で隠す。
+/// 枠なしの窓は縁の子ウインドウでリサイズを受けるため、縁をつかむだけで WebView のフォーカスが外れる。
+/// そのときも窓は前面のままなので、前面でなくなるまで待てばリサイズ中に隠れない
+fn watch_focus_lost(app: &AppHandle) {
+    let state = app.state::<TrayState>();
+    let generation = state.focus_generation.fetch_add(1, Ordering::Relaxed) + 1;
+    let app = app.clone();
+    std::thread::spawn(move || loop {
+        std::thread::sleep(FOREGROUND_POLL);
+        // フォーカスが戻った（または新しい監視が始まった）
+        if app.state::<TrayState>().focus_generation.load(Ordering::Relaxed) != generation {
+            return;
+        }
+        let Some(window) = main_window(&app) else { return };
+        if !window.is_visible().unwrap_or(false) {
+            return;
+        }
+        if !is_foreground(&window) {
+            hide(&app);
+            return;
+        }
+    });
 }
 
 /// 窓をトレイの上に出す。hash を渡すとそのページ（#/layout など）に移る
@@ -99,8 +140,11 @@ fn main() {
 
             let handle = app.handle().clone();
             window.on_window_event(move |event| match event {
-                // 他の場所をクリックしたら隠す
-                WindowEvent::Focused(false) => hide(&handle),
+                // 他の場所をクリックしたら隠す（リサイズで外れたときは隠さない）
+                WindowEvent::Focused(false) => watch_focus_lost(&handle),
+                WindowEvent::Focused(true) => {
+                    handle.state::<TrayState>().focus_generation.fetch_add(1, Ordering::Relaxed);
+                }
                 // Alt+F4 などで閉じてもアプリは終わらせず、隠すだけにする
                 WindowEvent::CloseRequested { api, .. } => {
                     api.prevent_close();

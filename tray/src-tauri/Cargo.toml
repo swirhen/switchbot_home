@@ -14,6 +14,10 @@ tauri-plugin-opener = "2"
 tauri-plugin-positioner = { version = "2", features = ["tray-icon"] }
 tauri-plugin-single-instance = "2"
 
+[target.'cfg(windows)'.dependencies]
+# 前面のウインドウを調べる（リサイズ中にフォーカスが外れても隠さないため）
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
+
 [profile.release]
 # 常駐アプリなので、サイズを小さくする
 codegen-units = 1
