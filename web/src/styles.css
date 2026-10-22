@@ -618,3 +618,38 @@ input.switch:checked::after {
     transform: rotate(360deg);
   }
 }
+/* レイアウトページではナビのボタンに今のレイアウト名を出す（長い名前は省略） */
+.nav-current {
+  max-width: 10em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+nav .nav-button {
+  gap: 4px;
+}
+/* 編集ボタンの右上に保存状態を点で示す */
+button.has-dot {
+  position: relative;
+}
+.save-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.save-dot.saving {
+  background: #f0d68f;
+  animation: blink 0.8s ease-in-out infinite alternate;
+}
+.save-dot.error {
+  background: var(--red);
+}
+@keyframes blink {
+  to {
+    opacity: 0.2;
+  }
+}

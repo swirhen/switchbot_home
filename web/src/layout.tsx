@@ -25,6 +25,8 @@ type Drag = { id: string; mode: 'move' | 'resize'; startX: number; startY: numbe
 
 type SaveState = 'saved' | 'saving' | 'error'
 
+const SAVE_LABELS: Record<SaveState, string> = { saved: '保存済み', saving: '保存中', error: '保存に失敗しました' }
+
 type Target = { group?: boolean; device?: Device; scene?: Scene }
 
 const GRID = 10
@@ -362,21 +364,20 @@ function LayoutEditor({ layout, layouts, onLogout, onSelect, onCreate, onDelete,
 					{ key: 'new', label: <><Plus size={14} /> 新規レイアウト</>, onSelect: onCreate },
 					...layouts.map((l, i) => ({ key: l.id, label: layoutLabel(l, i), active: l.id === layout.id, onSelect: () => onSelect(l.id) })),
 				]}
+				layoutMenuLabel={layoutLabel(layout, currentIndex)}
 			>
-				<small>{layoutLabel(layout, currentIndex)}</small>
-				<small className={saveState === 'error' ? 'error' : ''}>
-					{saveState === 'saving' ? '保存中...' : saveState === 'error' ? '保存に失敗しました' : '保存済み'}
-				</small>
 				<button onClick={refreshAll} disabled={statusWidgetCount === 0 || refreshing} title="状態表示を再取得">
 					<RefreshCw size={16} className={refreshing ? 'spin' : ''} /><span className="btn-text">状態を更新</span>
 				</button>
 				<button
-					className={editing ? 'active' : ''}
+					className={editing ? 'active has-dot' : 'has-dot'}
 					onClick={() => { setEditing(!editing); setActiveId(null) }}
-					title={editing ? '編集を終える' : 'レイアウトを編集'}
-					aria-label={editing ? '完了' : '編集'}
+					title={`${editing ? '編集を終える' : 'レイアウトを編集'}（${SAVE_LABELS[saveState]}）`}
+					aria-label={`${editing ? '完了' : '編集'}（${SAVE_LABELS[saveState]}）`}
 				>
 					{editing ? <><Check size={16} /><span className="btn-text">完了</span></> : <><Pencil size={16} /><span className="btn-text">編集</span></>}
+					{/* 保存状態は右上の点で示す（保存済み: 緑、保存中: 黄、失敗: 赤） */}
+					<span className={`save-dot ${saveState}`} aria-hidden="true" />
 				</button>
 			</Header>
 

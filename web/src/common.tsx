@@ -1,5 +1,5 @@
 import React from 'react'
-import { LogOut } from 'lucide-react'
+import { ChevronDown, LogOut } from 'lucide-react'
 
 export type Device = {
 	id: string
@@ -261,11 +261,13 @@ export function PopupMenu({ label, items, className = '', disabled = false }: {
 	)
 }
 
-export function Header({ page, onLogout, layoutMenu, children }: {
+export function Header({ page, onLogout, layoutMenu, layoutMenuLabel, children }: {
 	page: Page
 	onLogout: () => void
 	// レイアウトページを開いているときは「レイアウト」を押すと切り替えメニューを出す
 	layoutMenu?: MenuItem[]
+	// 切り替えメニューのボタンに出す、今開いているレイアウトの名前
+	layoutMenuLabel?: string
 	children?: React.ReactNode
 }) {
 	return (
@@ -275,7 +277,13 @@ export function Header({ page, onLogout, layoutMenu, children }: {
 				<nav>
 					<a href="#/" className={page === 'dashboard' ? 'active' : ''}>一覧</a>
 					{layoutMenu
-						? <PopupMenu label="レイアウト" className="nav-button active" items={layoutMenu} />
+						? (
+							<PopupMenu
+								label={<><span className="nav-current">{layoutMenuLabel ?? 'レイアウト'}</span><ChevronDown size={12} /></>}
+								className="nav-button active"
+								items={layoutMenu}
+							/>
+						)
 						: <a href="#/layout" className={page === 'layout' ? 'active' : ''}>レイアウト</a>}
 					<a href="#/schedule" className={page === 'schedule' ? 'active' : ''}>スケジュール</a>
 				</nav>
