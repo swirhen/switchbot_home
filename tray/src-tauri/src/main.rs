@@ -20,6 +20,9 @@ const DEFAULT_BASE_URL: &str = "https://swirhen.tv/switchbot_home/";
 const WINDOW_LABEL: &str = "main";
 // 窓の外（トレイアイコンを含む）をクリックして隠れた直後のクリックは、開き直さない
 const REOPEN_GUARD: Duration = Duration::from_millis(300);
+// 実行ファイル（タスクバーのアイコンなど）から起動されたときの同様の猶予。
+// クリックで窓が隠れてから、起動した側の知らせが届くまでの間を見込んで長めにする
+const LAUNCH_REOPEN_GUARD: Duration = Duration::from_millis(1000);
 // フォーカスが外れた後、他のウインドウが前面に来たかを調べる間隔
 const FOREGROUND_POLL: Duration = Duration::from_millis(50);
 
@@ -100,7 +103,9 @@ fn show(app: &AppHandle, hash: Option<&str>) {
     let _ = window.set_focus();
 }
 
-fn toggle(app: &AppHandle) {
+/// 開いていれば隠し、隠れていれば出す。
+/// クリックした時点で窓は前面でなくなり隠れるため、guard 以内に隠れたばかりなら開いていたものとして出さない
+fn toggle(app: &AppHandle, guard: Duration) {
     let Some(window) = main_window(app) else { return };
     if window.is_visible().unwrap_or(false) {
         hide(app);
@@ -111,16 +116,30 @@ fn toggle(app: &AppHandle) {
         .hidden_at
         .lock()
         .unwrap()
-        .is_some_and(|at| at.elapsed() < REOPEN_GUARD);
+        .is_some_and(|at| at.elapsed() < guard);
     if !just_hidden {
         show(app, None);
     }
 }
 
+/// 起動した側（すぐ終了する）から、動いている側へ窓を前面に出す権利を渡す。
+/// 起動直後のプロセスは前面に出す権利を持つが、知らせを受ける側は持たないため
+#[cfg(windows)]
+fn allow_foreground_for_running_instance() {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{AllowSetForegroundWindow, ASFW_ANY};
+    unsafe {
+        AllowSetForegroundWindow(ASFW_ANY);
+    }
+}
+
+#[cfg(not(windows))]
+fn allow_foreground_for_running_instance() {}
+
 fn main() {
+    allow_foreground_for_running_instance();
     tauri::Builder::default()
-        // 2つ目を起動しようとしたら、動いている方の窓を出す
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show(app, None)))
+        // 2つ目を起動しようとしたら（タスクバーのアイコンなど）、動いている方の窓を開閉する
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| toggle(app, LAUNCH_REOPEN_GUARD)))
         .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .plugin(tauri_plugin_opener::init())
@@ -219,7 +238,7 @@ fn main() {
                         ..
                     } = event
                     {
-                        toggle(app);
+                        toggle(app, REOPEN_GUARD);
                     }
                 })
                 .build(app)?;
