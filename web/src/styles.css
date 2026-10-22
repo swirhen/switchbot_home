@@ -669,3 +669,9 @@ button.has-dot {
     opacity: 0.2;
   }
 }
+/* メニュー内の区切り線（「一覧」の上） */
+.popup-menu li.separator {
+  border-top: 1px solid var(--line);
+  margin-top: 4px;
+  padding-top: 4px;
+}

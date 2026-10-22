@@ -1,5 +1,6 @@
 import React from 'react'
-import { ChevronDown, LogOut } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { ChevronDown, LogOut, Plus } from 'lucide-react'
 
 export type Device = {
 	id: string
@@ -208,7 +209,15 @@ export function useHash() {
 	return hash
 }
 
-export type MenuItem = { key: string; label: React.ReactNode; onSelect: () => void; active?: boolean; disabled?: boolean }
+export type MenuItem = { key: string; label: React.ReactNode; onSelect: () => void; active?: boolean; disabled?: boolean; separator?: boolean }
+
+// ヘッダーの切り替えメニューに出すレイアウト（中身は layout.tsx 側で扱う）
+export type LayoutSummary = { id: string; name: string }
+
+export const layoutLabel = (layout: LayoutSummary, index: number) => layout.name || `レイアウト ${index + 1}`
+
+// URL では名前があれば名前、無ければ id で指す
+export const layoutPath = (layout: LayoutSummary) => `#/layout/${encodeURIComponent(layout.name || layout.id)}`
 
 // ボタンの真下に開く選択メニュー。外側をクリックするか Esc で閉じる
 export function PopupMenu({ label, items, className = '', disabled = false }: {
@@ -240,7 +249,7 @@ export function PopupMenu({ label, items, className = '', disabled = false }: {
 			{open && (
 				<ul className="popup-menu" role="menu">
 					{items.map(item => (
-						<li key={item.key}>
+						<li key={item.key} className={item.separator ? 'separator' : undefined}>
 							<button
 								type="button"
 								role="menuitem"
@@ -261,15 +270,30 @@ export function PopupMenu({ label, items, className = '', disabled = false }: {
 	)
 }
 
-export function Header({ page, onLogout, layoutMenu, layoutMenuLabel, children }: {
+export function Header({ page, onLogout, currentLayoutId, layoutMenuLabel, onCreateLayout, children }: {
 	page: Page
 	onLogout: () => void
-	// レイアウトページを開いているときは「レイアウト」を押すと切り替えメニューを出す
-	layoutMenu?: MenuItem[]
-	// 切り替えメニューのボタンに出す、今開いているレイアウトの名前
+	// レイアウトページを開いているときの、今のレイアウトと切り替えメニューのボタンに出す名前
+	currentLayoutId?: string
 	layoutMenuLabel?: string
+	// レイアウトページでだけ、メニューの一番上に「新規レイアウト」を出す
+	onCreateLayout?: () => void
 	children?: React.ReactNode
 }) {
+	// どのページでも切り替えメニューを開けるよう、レイアウトの一覧はヘッダーでも読む（SwitchBot API は呼ばない）
+	const layoutsQuery = useQuery({ queryKey: ['layouts'], queryFn: () => api<{ layouts: LayoutSummary[] }>('/layouts'), retry: false })
+	const layouts = layoutsQuery.data?.layouts ?? []
+	const menu: MenuItem[] = [
+		...(onCreateLayout ? [{ key: 'new', label: <><Plus size={14} /> 新規レイアウト</>, onSelect: onCreateLayout }] : []),
+		...layouts.map((l, i) => ({
+			key: l.id,
+			label: layoutLabel(l, i),
+			active: page === 'layout' && l.id === currentLayoutId,
+			onSelect: () => { window.location.hash = layoutPath(l) },
+		})),
+		{ key: 'dashboard', label: '一覧', active: page === 'dashboard', separator: true, onSelect: () => { window.location.hash = '#/' } },
+	]
+	const menuLabel = page === 'layout' ? layoutMenuLabel ?? 'レイアウト' : page === 'dashboard' ? '一覧' : 'レイアウト'
 	return (
 		<header>
 			<div className="title-row">
@@ -279,16 +303,12 @@ export function Header({ page, onLogout, layoutMenu, layoutMenuLabel, children }
 					<span className="title-text">SwitchBot Home</span>
 				</h1>
 				<nav>
-					<a href="#/" className={page === 'dashboard' ? 'active' : ''}>一覧</a>
-					{layoutMenu
-						? (
-							<PopupMenu
-								label={<><span className="nav-current">{layoutMenuLabel ?? 'レイアウト'}</span><ChevronDown size={12} /></>}
-								className="nav-button active"
-								items={layoutMenu}
-							/>
-						)
-						: <a href="#/layout" className={page === 'layout' ? 'active' : ''}>レイアウト</a>}
+					{/* 一覧ページへはこのメニューの一番下から移る */}
+					<PopupMenu
+						label={<><span className="nav-current">{menuLabel}</span><ChevronDown size={12} /></>}
+						className={page === 'schedule' ? 'nav-button' : 'nav-button active'}
+						items={menu}
+					/>
 					<a href="#/schedule" className={page === 'schedule' ? 'active' : ''}>スケジュール</a>
 				</nav>
 			</div>

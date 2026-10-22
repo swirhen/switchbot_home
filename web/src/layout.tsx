@@ -2,7 +2,7 @@ import React from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Copy, Pencil, Play, Plus, RefreshCw, Trash2, Type } from 'lucide-react'
 import {
-	Device, DevicesResponse, Header, PopupMenu, Scene, StatusesResponse, StatusView, UnauthorizedError,
+	Device, DevicesResponse, Header, PopupMenu, layoutLabel, layoutPath, Scene, StatusesResponse, StatusView, UnauthorizedError,
 	api, deviceActions, errorMessage, executeScene, hasStatus, sendCommand, useHash, useToast,
 } from './common'
 
@@ -73,19 +73,15 @@ type LayoutsResponse = { layouts: LayoutDoc[] }
 
 const LAST_LAYOUT_KEY = 'switchbot_home_last_layout'
 
-const layoutLabel = (layout: LayoutDoc, index: number) => layout.name || `レイアウト ${index + 1}`
 
-// URL では名前があれば名前、無ければ id で指す
-const layoutPath = (layout: LayoutDoc) => `#/layout/${encodeURIComponent(layout.name || layout.id)}`
 
 // 他のレイアウトから写すときは、ウィジェットの id を振り直す
 const cloneWidgets = (items: Widget[]) => items.map(w => ({ ...w, id: crypto.randomUUID() }))
 
-function LayoutEditor({ layout, layouts, onLogout, onSelect, onCreate, onDelete, onRename }: {
+function LayoutEditor({ layout, layouts, onLogout, onCreate, onDelete, onRename }: {
 	layout: LayoutDoc
 	layouts: LayoutDoc[]
 	onLogout: () => void
-	onSelect: (id: string) => void
 	onCreate: () => void
 	onDelete: (id: string) => void
 	onRename: (id: string, name: string) => Promise<string | null>
@@ -360,11 +356,9 @@ function LayoutEditor({ layout, layouts, onLogout, onSelect, onCreate, onDelete,
 			<Header
 				page="layout"
 				onLogout={onLogout}
-				layoutMenu={[
-					{ key: 'new', label: <><Plus size={14} /> 新規レイアウト</>, onSelect: onCreate },
-					...layouts.map((l, i) => ({ key: l.id, label: layoutLabel(l, i), active: l.id === layout.id, onSelect: () => onSelect(l.id) })),
-				]}
+				currentLayoutId={layout.id}
 				layoutMenuLabel={layoutLabel(layout, currentIndex)}
+				onCreateLayout={onCreate}
 			>
 				<button onClick={refreshAll} disabled={statusWidgetCount === 0 || refreshing} title="状態表示を再取得">
 					<RefreshCw size={16} className={refreshing ? 'spin' : ''} /><span className="btn-text">状態を更新</span>
@@ -569,5 +563,5 @@ export function LayoutPage({ onLogout }: { onLogout: () => void }) {
 	}
 	if (!current) return <main><p className="muted">読み込み中...</p></main>
 	// レイアウトを切り替えたら編集中の状態を作り直す
-	return <LayoutEditor key={current.id} layout={current} layouts={layouts} onLogout={onLogout} onSelect={select} onCreate={create} onDelete={remove} onRename={rename} />
+	return <LayoutEditor key={current.id} layout={current} layouts={layouts} onLogout={onLogout} onCreate={create} onDelete={remove} onRename={rename} />
 }
