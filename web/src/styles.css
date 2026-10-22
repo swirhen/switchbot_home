@@ -374,7 +374,7 @@ main.layout-page {
   flex-direction: column;
   min-width: 0;
 }
-/* 背景はウィジェット側に置き、取得時刻（z-index: 0）を本体（z-index: 1）の裏に描く */
+/* 背景はウィジェット側に置き、本体（z-index: 1）の手前に取得時刻（z-index: 2）を置く */
 .widget-status {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -386,13 +386,31 @@ main.layout-page {
   gap: 6px;
   overflow: auto;
 }
-.widget-time {
+/* 取得時刻。クリックでその機器の状態を取り直すので、本体より手前に置く */
+button.widget-time {
   position: absolute;
-  right: 8px;
-  bottom: 4px;
-  z-index: 0;
-  font-size: 10px;
+  right: 4px;
+  bottom: 2px;
+  z-index: 2;
+  gap: 3px;
+  padding: 1px 4px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  font: 10px "IBM Plex Mono";
+  color: var(--muted);
   opacity: 0.6;
+}
+button.widget-time:hover:not(:disabled) {
+  opacity: 1;
+  color: var(--green);
+  background: #000c;
+}
+button.widget-time:disabled {
+  opacity: 0.6;
+}
+/* 編集中はウィジェットのドラッグを邪魔しない */
+.canvas.editing .widget-time {
   pointer-events: none;
 }
 .widget-group {

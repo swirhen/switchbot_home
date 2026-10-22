@@ -261,6 +261,8 @@ function LayoutEditor({ layout, layouts, onLogout, onCreate, onDelete, onRename 
 	const [editingWidgetId, setEditingWidgetId] = React.useState<string | null>(null)
 	const [busy, setBusy] = React.useState<string | null>(null)
 	const [refreshing, setRefreshing] = React.useState(false)
+	// 個別に状態を取り直している機器
+	const [refreshingIds, setRefreshingIds] = React.useState<Set<string>>(() => new Set())
 	const [saveState, setSaveState] = React.useState<SaveState>('saved')
 	const [targetKey, setTargetKey] = React.useState('')
 	const [contentKey, setContentKey] = React.useState('')
@@ -471,6 +473,23 @@ function LayoutEditor({ layout, layouts, onLogout, onCreate, onDelete, onRename 
 		}
 	}
 
+	// 状態表示の取得時刻をクリックしたときに、その機器だけ取り直す
+	const refreshOne = async (device: Device) => {
+		setRefreshingIds(ids => new Set(ids).add(device.id))
+		try {
+			const failed = await fetchStatuses([device.id])
+			if (failed) showToast(`${device.name} の状態を取得できませんでした`, true)
+		} catch (err) {
+			handleError(err)
+		} finally {
+			setRefreshingIds(ids => {
+				const next = new Set(ids)
+				next.delete(device.id)
+				return next
+			})
+		}
+	}
+
 	const currentIndex = Math.max(0, layouts.findIndex(l => l.id === layout.id))
 
 	const statusWidgetCount = new Set(widgets.filter(w => w.kind === 'status').map(w => w.targetId)).size
@@ -612,8 +631,17 @@ function LayoutEditor({ layout, layouts, onLogout, onCreate, onDelete, onRename 
 								onPointerUp={endDrag}
 								onPointerCancel={endDrag}
 							>
-								{widget.kind === 'status' && device && statuses[device.id]?.fetchedAt && (
-									<small className="widget-time">{formatClock(statuses[device.id].fetchedAt!)}</small>
+								{widget.kind === 'status' && device && hasStatus(device) && (
+									<button
+										type="button"
+										className="widget-time"
+										onClick={() => refreshOne(device)}
+										disabled={editing || refreshing || refreshingIds.has(device.id)}
+										title="クリックでこの機器の状態を再取得"
+									>
+										{(refreshing || refreshingIds.has(device.id)) && <RefreshCw size={9} className="spin" aria-hidden="true" />}
+										{statuses[device.id]?.fetchedAt ? formatClock(statuses[device.id].fetchedAt!) : '未取得'}
+									</button>
 								)}
 								<div className="widget-body">
 									{isGroup ? (
