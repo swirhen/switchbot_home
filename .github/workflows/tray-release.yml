@@ -1,0 +1,77 @@
+# タスクトレイアプリ（tray/）をビルドし、インストーラーと実行ファイルを GitHub Releases に置く。
+# - タグ tray-v<バージョン> の push でリリースを作る（tray\release.ps1 がバージョン更新・タグ付け・push を行う）
+# - 手動実行（workflow_dispatch）はビルドだけ行い、成果物を Actions の Artifacts に置く（リリースは作らない）
+name: tray-release
+
+on:
+  push:
+    tags:
+      - "tray-v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: tray
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: バージョンの確認
+        id: version
+        run: |
+          $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $cargo = (Select-String -Path src-tauri/Cargo.toml -Pattern '^version = "(.+)"' | Select-Object -First 1).Matches[0].Groups[1].Value
+          if ($version -ne $cargo) { throw "tauri.conf.json ($version) と Cargo.toml ($cargo) のバージョンが違う" }
+          if ($env:GITHUB_REF_TYPE -eq "tag" -and $env:GITHUB_REF_NAME -ne "tray-v$version") {
+            throw "タグ ($env:GITHUB_REF_NAME) が tauri.conf.json のバージョン ($version) と合わない"
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tray/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tray/src-tauri -> target
+
+      - name: ビルド
+        run: |
+          npm ci
+          npm run tauri build
+
+      - name: 成果物をまとめる
+        run: |
+          $v = "${{ steps.version.outputs.version }}"
+          New-Item -ItemType Directory -Force out | Out-Null
+          Copy-Item "src-tauri/target/release/bundle/nsis/*-setup.exe" "out/SwitchBotHomeTray_${v}_x64-setup.exe"
+          Copy-Item "src-tauri/target/release/switchbot-home-tray.exe" "out/SwitchBotHomeTray_${v}_x64.exe"
+          Get-ChildItem out
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: SwitchBotHomeTray_${{ steps.version.outputs.version }}
+          path: tray/out/*
+
+      - name: リリースを作る
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $v = "${{ steps.version.outputs.version }}"
+          $notes = @"
+          - ``SwitchBotHomeTray_${v}_x64-setup.exe``: インストーラー（スタートメニュー登録・アンインストール対応）
+          - ``SwitchBotHomeTray_${v}_x64.exe``: 実行ファイル単体（インストール不要。WebView2 が必要）
+          "@
+          gh release create $env:GITHUB_REF_NAME (Get-ChildItem out/*.exe).FullName `
+            --title "SwitchBot Home Tray v$v" --notes $notes --generate-notes

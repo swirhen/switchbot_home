@@ -50,3 +50,6 @@
 - ビルドは `tray\build.ps1`（インストーラーを作る）、開発起動は `tray\dev.ps1`（`-Local` で手元の `http://127.0.0.1:5175/` を開く）。
 - Rust のビルド結果は OneDrive の同期と日本語パスを避けるため、`CARGO_TARGET_DIR` で `~\.cargo-target\switchbot_home_tray` に出す（スクリプトが設定する）。直接 `cargo` を使うときも同じ環境変数を付ける。
 - 必要なもの: Rust（rustup）、Visual Studio Build Tools の「C++ によるデスクトップ開発」、WebView2（Windows 11 は標準）。
+- GitHub でのリリース: `tray\release.ps1 <バージョン>`（例: `0.2.0`）で `tauri.conf.json` / `Cargo.toml` / `Cargo.lock` のバージョンを書き換えてコミットし、タグ `tray-v<バージョン>` を push する。タグの push で `.github/workflows/tray-release.yml` が Windows 上でビルドし、インストーラー（`SwitchBotHomeTray_<バージョン>_x64-setup.exe`）と実行ファイル単体（`SwitchBotHomeTray_<バージョン>_x64.exe`）を Releases に置く。Actions の手動実行はビルドだけで、成果物は Artifacts に置く。
+- バージョンは 3 ファイルで揃える必要があり、ワークフローはタグ・`tauri.conf.json`・`Cargo.toml` が食い違うと止まる。手で書き換えず `release.ps1` を使う。
+- `.ps1` は PowerShell 5.1 で日本語が化けないよう BOM 付き UTF-8 で保存する。
