@@ -27,6 +27,9 @@ export type Action = { label: string; command: string; parameter?: unknown; conf
 export type Page = 'dashboard' | 'layout' | 'schedule'
 
 export const base = `${import.meta.env.BASE_URL}api`
+
+// タスクトレイのポップアップから開くときの表示（URL の ?compact）。# より前に付けるのでページを移っても続く
+export const COMPACT = new URLSearchParams(window.location.search).has('compact')
 const AUTH_TOKEN_KEY = 'switchbot_home_token'
 
 export function getAuthToken(): string | null {

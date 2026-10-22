@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Play, Power, PowerOff, RefreshCw } from 'lucide-react'
 import {
-	Action, Device, DevicesResponse, Header, Page, Scene, StatusesResponse, StatusView, UnauthorizedError,
+	Action, COMPACT, Device, DevicesResponse, Header, Page, Scene, StatusesResponse, StatusView, UnauthorizedError,
 	api, base, deviceActions, errorMessage, executeScene, hasStatus, sendCommand, setAuthToken, supportsOnOff, useToast,
 } from './common'
 import { LayoutPage } from './layout'
@@ -295,6 +295,8 @@ function App() {
 	if (page === 'schedule') return <SchedulePage onLogout={logout} />
 	return <Dashboard onLogout={logout} />
 }
+
+if (COMPACT) document.documentElement.classList.add('compact')
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: false } } })
 

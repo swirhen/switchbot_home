@@ -677,3 +677,41 @@ button.has-dot {
   margin-top: 4px;
   padding-top: 4px;
 }
+/* キャンバスのウィジェットはこの中に置く（コンパクト表示で縮小するときの基準） */
+.canvas-scale {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+/* タスクトレイのポップアップ用（URL の ?compact）: 余白を最小にし、タイトルとボタンはアイコンだけにする */
+html.compact main {
+  padding: 0 4px 24px;
+}
+html.compact main.layout-page {
+  padding-bottom: 4px;
+}
+html.compact header {
+  padding: 4px 0 2px;
+}
+html.compact .btn-text,
+html.compact header .title-text {
+  display: none;
+}
+html.compact .title-icon {
+  display: block;
+  width: 22px;
+  height: 22px;
+}
+html.compact .title-row {
+  gap: 4px 8px;
+}
+html.compact h2 {
+  font-size: 1.1em;
+  margin: 8px 0 4px;
+}
+html.compact .canvas-wrap {
+  margin-top: 4px;
+  border: none;
+  border-radius: 0;
+}
