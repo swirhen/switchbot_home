@@ -9,7 +9,8 @@ import sys
 import threading
 import time
 from typing import Any, Literal
-from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Response
+from collections import deque
+from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from switchbot_client import SwitchBotClient, SwitchBotError, load_config
@@ -46,6 +47,15 @@ client = SwitchBotClient.from_env()
 cache_lock = threading.Lock()
 cache: dict[str, tuple[float, Any]] = {}
 ir_state_lock = threading.Lock()
+
+# パスワードの総当たり対策。失敗が続いた接続元は一定時間ログインを受け付けない。
+# 接続元が分散しても試せる回数を抑えるため、全体の失敗回数にも上限を設ける（発行済みのログインは影響を受けない）
+LOGIN_WINDOW = 60 * 15
+LOGIN_MAX_FAILURES_PER_IP = 5
+LOGIN_MAX_FAILURES_TOTAL = 30
+login_lock = threading.Lock()
+login_failures: dict[str, deque[float]] = {}
+login_failures_total: deque[float] = deque()
 
 
 class CommandRequest(BaseModel):
@@ -252,10 +262,60 @@ def session(_auth=Depends(require_auth)):
     return {'authenticated': True}
 
 
+def _prune_failures(failures: deque[float], now: float):
+    while failures and now - failures[0] >= LOGIN_WINDOW:
+        failures.popleft()
+
+
+def _login_retry_after(ip: str, now: float) -> int:
+    """ログインを受け付けられるまでの秒数（0 なら受け付ける）"""
+    with login_lock:
+        _prune_failures(login_failures_total, now)
+        for key in [key for key, failures in login_failures.items() if not failures or now - failures[-1] >= LOGIN_WINDOW]:
+            del login_failures[key]
+        waits = []
+        failures = login_failures.get(ip)
+        if failures:
+            _prune_failures(failures, now)
+            if len(failures) >= LOGIN_MAX_FAILURES_PER_IP:
+                waits.append(failures[-LOGIN_MAX_FAILURES_PER_IP] + LOGIN_WINDOW - now)
+        if len(login_failures_total) >= LOGIN_MAX_FAILURES_TOTAL:
+            waits.append(login_failures_total[-LOGIN_MAX_FAILURES_TOTAL] + LOGIN_WINDOW - now)
+        return int(max(waits)) + 1 if waits else 0
+
+
+def _record_login_failure(ip: str, now: float):
+    with login_lock:
+        login_failures.setdefault(ip, deque()).append(now)
+        login_failures_total.append(now)
+
+
+def _credentials_match(username: str, password: str) -> bool:
+    # compare_digest は ASCII 以外の str を受け付けないので bytes で比べる
+    return (
+        hmac.compare_digest(username.encode(), USERNAME.encode())
+        & hmac.compare_digest(password.encode(), PASSWORD.encode())
+    )
+
+
 @app.post('/api/login')
-def login(payload: LoginRequest, response: Response):
-    if not PASSWORD or not SECRET or not hmac.compare_digest(payload.username, USERNAME) or not hmac.compare_digest(payload.password, PASSWORD):
+def login(payload: LoginRequest, request: Request, response: Response):
+    # 本番は Apache 経由。uvicorn が 127.0.0.1 からの X-Forwarded-For を見て、client.host を本来の接続元にする
+    ip = request.client.host if request.client else 'unknown'
+    now = time.time()
+    retry_after = _login_retry_after(ip, now)
+    if retry_after:
+        minutes = (retry_after + 59) // 60
+        raise HTTPException(
+            status_code=429,
+            detail=f'ログインの失敗が続いたため、しばらく受け付けません（約 {minutes} 分後に再試行してください）',
+            headers={'Retry-After': str(retry_after)},
+        )
+    if not PASSWORD or not SECRET or not _credentials_match(payload.username, payload.password):
+        _record_login_failure(ip, now)
         raise HTTPException(status_code=401, detail='ユーザー名またはパスワードが違います')
+    with login_lock:
+        login_failures.pop(ip, None)
     issued_at = int(time.time())
     token = hmac.new(SECRET.encode(), f'{issued_at}:{USERNAME}'.encode(), hashlib.sha256).hexdigest()
     session_value = f'{issued_at}:{token}'

@@ -25,6 +25,7 @@
 - SwitchBot API は 1日 10,000 回まで。機器一覧・シーンは 10 分、状態は 30 秒キャッシュしている。ポーリングを増やすときは回数に注意する。
 - 赤外線リモコンは状態を取得できない。オートメーション（スケジュール等）は API から取得・登録できない。
 - `config.json` の値は表示・コミットしない。
+- ログインは失敗回数で制限している（同じ接続元で 15 分に 5 回、全体で 15 分に 30 回を超えると 429）。記録はメモリ上だけで、API を再起動すると消える。接続元 IP は、uvicorn が Apache（127.0.0.1）から受け取った `X-Forwarded-For` で判断する。
 - スケジューラーは環境変数 `SWITCHBOT_HOME_SCHEDULER=1`（または `config.json` の `scheduler_enabled: true`）のサーバーでだけ動く。本番は systemd 定義で有効にしている。手元で有効にすると本番と二重に実行されるので、確認するときは本番の予定と重ならないようにする。
 
 ## 開発と検証
@@ -47,6 +48,7 @@
 
 - Tauri v2 製。窓は本番の Web アプリのコンパクト表示（`https://swirhen.tv/switchbot_home/?compact#/layout`）を直接開くだけで、画面や処理は Web 側にある。トレイアプリだけの変更は本番サーバーへのリリース不要。
 - `tray/src-tauri/src/main.rs`: トレイアイコン（左クリックで窓の開閉、右クリックでメニュー）、窓の外をクリックで隠す、多重起動防止、自動起動。
+- 窓は枠なしで、縁のリサイズは Tauri が置く子ウインドウが受ける。縁をつかむと WebView のフォーカスが外れて `Focused(false)` が来るため、すぐには隠さず、他のウインドウが前面に来た（`GetForegroundWindow`）ときに隠す。
 - ビルドは `tray\build.ps1`（インストーラーを作る）、開発起動は `tray\dev.ps1`（`-Local` で手元の `http://127.0.0.1:5175/` を開く）。
 - Rust のビルド結果は OneDrive の同期と日本語パスを避けるため、`CARGO_TARGET_DIR` で `~\.cargo-target\switchbot_home_tray` に出す（スクリプトが設定する）。直接 `cargo` を使うときも同じ環境変数を付ける。
 - 必要なもの: Rust（rustup）、Visual Studio Build Tools の「C++ によるデスクトップ開発」、WebView2（Windows 11 は標準）。

@@ -24,7 +24,7 @@ function Login({ onLogin }: { onLogin: () => void }) {
 			setAuthToken(data.token)
 			onLogin()
 		} catch (err) {
-			setError(err instanceof UnauthorizedError ? 'ユーザー名またはパスワードが違います' : String(err))
+			setError(err instanceof UnauthorizedError ? 'ユーザー名またはパスワードが違います' : err instanceof Error ? err.message : String(err))
 		}
 	}
 	return (
