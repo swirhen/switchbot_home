@@ -235,7 +235,8 @@ nav {
 nav a {
   color: var(--muted);
   text-decoration: none;
-  padding: 6px 12px;
+  font-size: 13px;
+  padding: 4px 10px;
   border: 1px solid transparent;
   border-radius: 6px;
 }
@@ -244,8 +245,8 @@ nav a.active {
   border-color: var(--green);
 }
 nav .nav-button {
-  font-size: 16px;
-  padding: 6px 12px;
+  font-size: 13px;
+  padding: 4px 10px;
   color: var(--muted);
   background: transparent;
   border-color: transparent;
@@ -592,6 +593,22 @@ input.switch:checked::after {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+/* API 呼び出し回数は画面右下に小さく固定表示する（クリックの邪魔をしない） */
+.usage-label {
+  position: fixed;
+  right: 8px;
+  bottom: 4px;
+  z-index: 5;
+  font-size: 10px;
+  opacity: 0.6;
+  pointer-events: none;
+}
+/* 画面幅が狭いときはヘッダーのボタンをアイコンだけにして、改行を抑える */
+@media (max-width: 720px) {
+  .header-actions .btn-text {
+    display: none;
+  }
 }
 .spin {
   animation: spin 1s linear infinite;

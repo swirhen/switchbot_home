@@ -368,10 +368,15 @@ function LayoutEditor({ layout, layouts, onLogout, onSelect, onCreate, onDelete,
 					{saveState === 'saving' ? '保存中...' : saveState === 'error' ? '保存に失敗しました' : '保存済み'}
 				</small>
 				<button onClick={refreshAll} disabled={statusWidgetCount === 0 || refreshing} title="状態表示を再取得">
-					<RefreshCw size={16} className={refreshing ? 'spin' : ''} /> 状態を更新
+					<RefreshCw size={16} className={refreshing ? 'spin' : ''} /><span className="btn-text">状態を更新</span>
 				</button>
-				<button className={editing ? 'active' : ''} onClick={() => { setEditing(!editing); setActiveId(null) }}>
-					{editing ? <><Check size={16} /> 完了</> : <><Pencil size={16} /> 編集</>}
+				<button
+					className={editing ? 'active' : ''}
+					onClick={() => { setEditing(!editing); setActiveId(null) }}
+					title={editing ? '編集を終える' : 'レイアウトを編集'}
+					aria-label={editing ? '完了' : '編集'}
+				>
+					{editing ? <><Check size={16} /><span className="btn-text">完了</span></> : <><Pencil size={16} /><span className="btn-text">編集</span></>}
 				</button>
 			</Header>
 

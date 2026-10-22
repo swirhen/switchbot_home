@@ -71,7 +71,7 @@ function subscribeUsage(listener: () => void) {
 export function UsageLabel() {
 	const usage = React.useSyncExternalStore(subscribeUsage, () => usageValue)
 	if (!usage) return null
-	return <small>API {usage.count.toLocaleString()} / {usage.limit.toLocaleString()}</small>
+	return <small className="usage-label">API {usage.count.toLocaleString()} / {usage.limit.toLocaleString()}</small>
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {

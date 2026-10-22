@@ -174,7 +174,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 		<main>
 			<Header page="dashboard" onLogout={onLogout}>
 				<button onClick={refreshAll} disabled={busy !== null} title="一覧と状態を再取得">
-					<RefreshCw size={16} className={busy === 'refresh' ? 'spin' : ''} /> 更新
+					<RefreshCw size={16} className={busy === 'refresh' ? 'spin' : ''} /><span className="btn-text">更新</span>
 				</button>
 			</Header>
 
