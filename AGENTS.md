@@ -42,3 +42,11 @@
 - GitHub へプッシュした後、`ssh -F ..\config prod-checker "cd /home/swirhen/switchbot_home && git pull --ff-only && cd web && ./release.sh"` で更新・ビルド・API 再起動を行う。
 - 実行後、`ssh -F ..\config prod-checker "systemctl is-active switchbot-home-api.service"` で `active` を確認する。
 - `release.sh` は `VITE_BASE_PATH=/switchbot_home/` でビルドする。
+
+## タスクトレイアプリ（`tray/`）
+
+- Tauri v2 製。窓は本番の Web アプリのコンパクト表示（`https://swirhen.tv/switchbot_home/?compact#/layout`）を直接開くだけで、画面や処理は Web 側にある。トレイアプリだけの変更は本番サーバーへのリリース不要。
+- `tray/src-tauri/src/main.rs`: トレイアイコン（左クリックで窓の開閉、右クリックでメニュー）、窓の外をクリックで隠す、多重起動防止、自動起動。
+- ビルドは `tray\build.ps1`（インストーラーを作る）、開発起動は `tray\dev.ps1`（`-Local` で手元の `http://127.0.0.1:5175/` を開く）。
+- Rust のビルド結果は OneDrive の同期と日本語パスを避けるため、`CARGO_TARGET_DIR` で `~\.cargo-target\switchbot_home_tray` に出す（スクリプトが設定する）。直接 `cargo` を使うときも同じ環境変数を付ける。
+- 必要なもの: Rust（rustup）、Visual Studio Build Tools の「C++ によるデスクトップ開発」、WebView2（Windows 11 は標準）。

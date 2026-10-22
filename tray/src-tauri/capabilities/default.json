@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "窓は本番の URL を開くだけで、ページからアプリの機能は呼ばない",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

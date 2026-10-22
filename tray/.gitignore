@@ -1,0 +1,4 @@
+node_modules/
+# ビルド結果はリポジトリの外（~\.cargo-target\switchbot_home_tray）に出すが、念のため
+src-tauri/target/
+src-tauri/gen/
