@@ -4,20 +4,20 @@
 //! SwitchBot Home をタスクトレイから開くアプリ。
 //! 窓は本番の Web アプリ（コンパクト表示）を直接開くだけで、画面や処理は持たない。
 
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, PhysicalPosition, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent};
+use tauri::{AppHandle, Manager, PhysicalPosition, Rect, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_opener::OpenerExt;
-use tauri_plugin_positioner::{Position, WindowExt};
 
 // 環境変数 SWITCHBOT_HOME_URL で開く先を変えられる（手元の開発用サーバーで試すとき）
 const DEFAULT_BASE_URL: &str = "https://swirhen.tv/switchbot_home/";
 const WINDOW_LABEL: &str = "main";
+const TRAY_ID: &str = "main";
 // 窓の外（トレイアイコンを含む）をクリックして隠れた直後のクリックは、開き直さない
 const REOPEN_GUARD: Duration = Duration::from_millis(300);
 // 実行ファイル（タスクバーのアイコンなど）から起動されたときの同様の猶予。
@@ -29,8 +29,8 @@ const FOREGROUND_POLL: Duration = Duration::from_millis(50);
 #[derive(Default)]
 struct TrayState {
     hidden_at: Mutex<Option<Instant>>,
-    // トレイアイコンの位置が分かってから、トレイ基準で窓を置く
-    tray_known: AtomicBool,
+    // 最後にトレイアイコンのイベントで分かったアイコンの中心。トレイから開くときにこの上に置く
+    tray_center: Mutex<Option<PhysicalPosition<f64>>>,
     // フォーカスが変わるたびに増やし、古い監視を止める
     focus_generation: AtomicU64,
 }
@@ -90,34 +90,49 @@ fn watch_focus_lost(app: &AppHandle) {
 /// 窓を出す場所
 #[derive(Clone, Copy)]
 enum Placement {
-    /// トレイアイコンの上
+    /// トレイアイコンの上（トレイアイコンやそのメニューから開いたとき）
     Tray,
     /// マウスカーソルのある画面（タスクバーのアイコンなど、実行ファイルから起動されたとき）
     Cursor,
 }
 
-/// マウスカーソルのある画面に窓を置く。カーソルがタスクバーの上（作業領域の外）ならその近くに、
-/// 画面の中なら作業領域の右下に置く。どの向きのタスクバーでも、作業領域に収めればタスクバーの隣になる
-fn move_to_cursor_monitor(app: &AppHandle, window: &WebviewWindow) -> Option<()> {
-    let cursor = app.cursor_position().ok()?;
-    let monitor = app.monitor_from_point(cursor.x, cursor.y).ok()??;
+/// anchor のある画面に窓を置く。anchor の近くに置いて作業領域に収めるので、タスクバー上の点ならどの向きのタスクバーでも隣になる。
+/// near でなく anchor が作業領域の中なら（エクスプローラーから起動したときなど）、作業領域の右下に置く。
+/// 窓の大きさは、拡大率の違う画面へ移すと移した先の拡大率で変わるので、それを見込んで位置を決める
+fn place_window(app: &AppHandle, window: &WebviewWindow, anchor: PhysicalPosition<f64>, near: bool) -> Option<()> {
+    let monitor = app.monitor_from_point(anchor.x, anchor.y).ok()??;
     let area = monitor.work_area();
-    // 拡大率の違う画面へ移すと、移した先の拡大率で大きさが変わる
     let size = window.outer_size().ok()?;
     let scale = monitor.scale_factor() / window.scale_factor().ok()?;
     let (width, height) = ((size.width as f64 * scale) as i32, (size.height as f64 * scale) as i32);
     let (left, top) = (area.position.x, area.position.y);
     let (right, bottom) = (left + area.size.width as i32, top + area.size.height as i32);
-    let (cx, cy) = (cursor.x as i32, cursor.y as i32);
-    let on_work_area = (left..right).contains(&cx) && (top..bottom).contains(&cy);
-    let (x, y) = if on_work_area {
+    let (ax, ay) = (anchor.x as i32, anchor.y as i32);
+    let on_work_area = (left..right).contains(&ax) && (top..bottom).contains(&ay);
+    let (x, y) = if on_work_area && !near {
         (right - width, bottom - height)
     } else {
-        (cx - width / 2, cy - height / 2)
+        (ax - width / 2, ay - height / 2)
     };
     let x = x.clamp(left, (right - width).max(left));
     let y = y.clamp(top, (bottom - height).max(top));
     window.set_position(PhysicalPosition::new(x, y)).ok()
+}
+
+/// トレイアイコンのイベントが持つアイコンの位置から中心を覚えておく。
+/// TrayIcon::rect() はメインスレッドでの処理を待つため、メインスレッドで動くイベント処理の中からは呼ばない
+fn remember_tray_center(app: &AppHandle, rect: &Rect) {
+    let position = rect.position.to_physical::<f64>(1.0);
+    let size = rect.size.to_physical::<f64>(1.0);
+    if size.width <= 0.0 || size.height <= 0.0 {
+        return;
+    }
+    let center = PhysicalPosition::new(position.x + size.width / 2.0, position.y + size.height / 2.0);
+    *app.state::<TrayState>().tray_center.lock().unwrap() = Some(center);
+}
+
+fn tray_center(app: &AppHandle) -> Option<PhysicalPosition<f64>> {
+    *app.state::<TrayState>().tray_center.lock().unwrap()
 }
 
 /// 窓を出す。hash を渡すとそのページ（#/layout など）に移る
@@ -126,14 +141,14 @@ fn show(app: &AppHandle, hash: Option<&str>, placement: Placement) {
     if let Some(hash) = hash {
         let _ = window.eval(&format!("location.hash = {hash:?}"));
     }
-    let placed = matches!(placement, Placement::Cursor) && move_to_cursor_monitor(app, &window).is_some();
-    if !placed {
-        let position = if app.state::<TrayState>().tray_known.load(Ordering::Relaxed) {
-            Position::TrayCenter
-        } else {
-            Position::BottomRight
-        };
-        let _ = window.move_window(position);
+    // トレイの位置が分からなければ、マウスカーソルのある画面に出す
+    let anchor = match placement {
+        Placement::Tray => tray_center(app).map(|center| (center, true)),
+        Placement::Cursor => None,
+    }
+    .or_else(|| app.cursor_position().ok().map(|cursor| (cursor, false)));
+    if let Some((anchor, near)) = anchor {
+        let _ = place_window(app, &window, anchor, near);
     }
     let _ = window.show();
     let _ = window.set_focus();
@@ -178,7 +193,6 @@ fn main() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             toggle(app, LAUNCH_REOPEN_GUARD, Placement::Cursor)
         }))
-        .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .plugin(tauri_plugin_opener::init())
         .manage(TrayState::default())
@@ -240,7 +254,7 @@ fn main() {
             )?;
 
             let autostart_item = autostart.clone();
-            TrayIconBuilder::with_id("main")
+            TrayIconBuilder::with_id(TRAY_ID)
                 .icon(app.default_window_icon().cloned().ok_or("アイコンがありません")?)
                 .tooltip("SwitchBot Home")
                 .menu(&menu)
@@ -268,8 +282,14 @@ fn main() {
                 })
                 .on_tray_icon_event(|tray, event| {
                     let app = tray.app_handle();
-                    tauri_plugin_positioner::on_tray_event(app, &event);
-                    app.state::<TrayState>().tray_known.store(true, Ordering::Relaxed);
+                    match &event {
+                        TrayIconEvent::Click { rect, .. }
+                        | TrayIconEvent::DoubleClick { rect, .. }
+                        | TrayIconEvent::Enter { rect, .. }
+                        | TrayIconEvent::Move { rect, .. }
+                        | TrayIconEvent::Leave { rect, .. } => remember_tray_center(app, rect),
+                        _ => {}
+                    }
                     if let TrayIconEvent::Click {
                         button: MouseButton::Left,
                         button_state: MouseButtonState::Up,
