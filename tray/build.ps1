@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     SwitchBot Home Tray をビルドしてインストーラー（NSIS）を作る
 .DESCRIPTION

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     SwitchBot Home Tray を開発用に起動する（Ctrl+C で終了）
 .DESCRIPTION
