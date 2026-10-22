@@ -58,7 +58,7 @@ jobs:
           Copy-Item "src-tauri/target/release/switchbot-home-tray.exe" "out/SwitchBotHomeTray_${v}_x64.exe"
           Get-ChildItem out
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         with:
           name: SwitchBotHomeTray_${{ steps.version.outputs.version }}
           path: tray/out/*
