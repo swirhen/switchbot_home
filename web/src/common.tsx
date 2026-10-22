@@ -273,7 +273,11 @@ export function Header({ page, onLogout, layoutMenu, layoutMenuLabel, children }
 	return (
 		<header>
 			<div className="title-row">
-				<h1>SwitchBot Home</h1>
+				{/* 画面幅が狭いときは文字の代わりにファビコンの家アイコンを出す */}
+				<h1>
+					<img className="title-icon" src={`${import.meta.env.BASE_URL}favicon.svg`} alt="SwitchBot Home" />
+					<span className="title-text">SwitchBot Home</span>
+				</h1>
 				<nav>
 					<a href="#/" className={page === 'dashboard' ? 'active' : ''}>一覧</a>
 					{layoutMenu
