@@ -1,12 +1,16 @@
 import React from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Copy, Pencil, Play, Plus, RefreshCw, Trash2, Type } from 'lucide-react'
+import { Check, Copy, Pencil, Plus, RefreshCw, Search, Trash2, Type } from 'lucide-react'
 import {
-	COMPACT, Device, DevicesResponse, Header, PopupMenu, layoutLabel, layoutPath, Scene, StatusesResponse, StatusView, UnauthorizedError,
+	COMPACT, Device, DevicesResponse, Header, Modal, PopupMenu, layoutLabel, layoutPath, Scene, StatusesResponse, StatusView, UnauthorizedError,
 	api, deviceActions, errorMessage, executeScene, hasStatus, sendCommand, useHash, useToast,
 } from './common'
+import { ICON_GROUPS, findIcon, suggestIcon } from './icons'
 
 type WidgetKind = 'status' | 'action' | 'scene' | 'group'
+
+// ボタンの表示（アイコンと文字・アイコンのみ・文字のみ）
+type ButtonDisplay = 'both' | 'icon' | 'text'
 
 type Widget = {
 	id: string
@@ -14,10 +18,145 @@ type Widget = {
 	targetId: string
 	command?: string | null
 	label: string
+	// 未設定（null）は種類ごとの既定。シーンは再生アイコン、機器の操作はアイコンなし
+	icon?: string | null
+	// 未設定（null）はアイコンがあれば both
+	display?: ButtonDisplay | null
 	x: number
 	y: number
 	w: number
 	h: number
+}
+
+const DISPLAY_LABELS: Record<ButtonDisplay, string> = { both: 'アイコンと文字', icon: 'アイコンのみ', text: '文字のみ' }
+
+const isButton = (widget: Widget) => widget.kind === 'action' || widget.kind === 'scene'
+
+const widgetIconKey = (widget: Pick<Widget, 'kind' | 'icon'>) => widget.icon ?? (widget.kind === 'scene' ? 'play' : null)
+
+// アイコンが無いときは、表示の指定にかかわらず文字を出す
+function widgetDisplay(widget: Pick<Widget, 'kind' | 'icon' | 'display'>): ButtonDisplay {
+	if (!findIcon(widgetIconKey(widget))) return 'text'
+	return widget.display ?? 'both'
+}
+
+// ボタンの中身。アイコンの大きさはボタンの大きさに合わせ、縦長のボタンではアイコンを文字の上に置く
+function ButtonContent({ widget }: { widget: Pick<Widget, 'kind' | 'icon' | 'display' | 'label' | 'w' | 'h'> }) {
+	const display = widgetDisplay(widget)
+	const Icon = display === 'text' ? undefined : findIcon(widgetIconKey(widget))?.Icon
+	const size = display === 'icon'
+		? Math.round(Math.max(18, Math.min(64, Math.min(widget.w, widget.h) * 0.5)))
+		: Math.round(Math.max(14, Math.min(28, widget.h * 0.3)))
+	const stacked = display === 'both' && widget.h >= 90
+	return (
+		<span className={stacked ? 'button-content stacked' : 'button-content'}>
+			{Icon && <Icon size={size} aria-hidden="true" />}
+			{display !== 'icon' && <span className="button-label">{widget.label}</span>}
+		</span>
+	)
+}
+
+// 表示名・アイコン・表示の仕方を編集する。ボタン以外（状態表示・グループ）は表示名だけ
+function WidgetEditor({ widget, onSave, onClose }: { widget: Widget; onSave: (patch: Partial<Widget>) => void; onClose: () => void }) {
+	const button = isButton(widget)
+	const [label, setLabel] = React.useState(widget.label)
+	const [icon, setIcon] = React.useState<string | null>(widgetIconKey(widget))
+	const [display, setDisplay] = React.useState<ButtonDisplay>(widgetDisplay(widget))
+	const [query, setQuery] = React.useState('')
+	const q = query.trim().toLowerCase()
+	const groups = ICON_GROUPS
+		.map(g => ({ ...g, icons: q ? g.icons.filter(i => i.label.toLowerCase().includes(q) || i.key.includes(q)) : g.icons }))
+		.filter(g => g.icons.length > 0)
+	const needsIcon = display !== 'text' && !findIcon(icon)
+
+	const chooseIcon = (key: string | null) => {
+		setIcon(key)
+		// アイコンを外したら文字のみ、文字のみのときにアイコンを選んだらアイコンと文字にする
+		if (!key) setDisplay('text')
+		else if (display === 'text') setDisplay('both')
+	}
+
+	const submit = (e: React.FormEvent) => {
+		e.preventDefault()
+		if (!label.trim() || needsIcon) return
+		onSave(button ? { label: label.trim(), icon, display } : { label: label.trim() })
+	}
+
+	const preview = { kind: widget.kind, icon, display, label: label.trim() || '（表示名）', w: widget.w, h: widget.h }
+	return (
+		<Modal title={button ? 'ボタンを編集' : '表示名を変更'} onClose={onClose} className={button ? 'widget-editor' : ''}>
+			<form className="form" onSubmit={submit}>
+				<label>表示名{button && <small>アイコンのみの表示でも、操作したときの通知とマウスを載せたときの説明に使います</small>}
+					<input value={label} onChange={e => setLabel(e.target.value)} autoFocus maxLength={60} />
+				</label>
+				{button && (
+					<>
+						<fieldset>
+							<legend>表示</legend>
+							<div className="radios">
+								{(Object.keys(DISPLAY_LABELS) as ButtonDisplay[]).map(d => (
+									<label key={d}>
+										<input type="radio" name="display" checked={display === d} onChange={() => setDisplay(d)} />
+										{DISPLAY_LABELS[d]}
+									</label>
+								))}
+							</div>
+						</fieldset>
+						<fieldset className="icon-field">
+							<legend>アイコン{findIcon(icon) && <small>　{findIcon(icon)!.label}</small>}</legend>
+							<label className="icon-search">
+								<Search size={14} aria-hidden="true" />
+								<input placeholder="名前で絞り込む（例: 冷房、施錠、電球）" value={query} onChange={e => setQuery(e.target.value)} aria-label="アイコンを名前で絞り込む" />
+							</label>
+							<div className="icon-picker">
+								{!q && (
+									<div className="icon-grid">
+										<button type="button" className={icon === null ? 'icon-option active' : 'icon-option'} onClick={() => chooseIcon(null)} title="アイコンなし">
+											<span className="icon-none">なし</span>
+										</button>
+									</div>
+								)}
+								{groups.map(g => (
+									<section key={g.label}>
+										<h3>{g.label}</h3>
+										<div className="icon-grid">
+											{g.icons.map(({ key, label: name, Icon }) => (
+												<button
+													type="button"
+													key={key}
+													className={icon === key ? 'icon-option active' : 'icon-option'}
+													onClick={() => chooseIcon(key)}
+													title={name}
+													aria-label={name}
+													aria-pressed={icon === key}
+												>
+													<Icon size={20} aria-hidden="true" />
+												</button>
+											))}
+										</div>
+									</section>
+								))}
+								{groups.length === 0 && <p className="muted">見つかりません</p>}
+							</div>
+						</fieldset>
+						<div className="widget-preview">
+							<small>プレビュー</small>
+							<div className="widget-preview-button" style={{ width: Math.min(widget.w, 300), height: Math.min(widget.h, 160) }}>
+								<button type="button" className="widget-button" tabIndex={-1} aria-hidden="true">
+									<ButtonContent widget={{ ...preview, w: Math.min(widget.w, 300), h: Math.min(widget.h, 160) }} />
+								</button>
+							</div>
+						</div>
+					</>
+				)}
+				{needsIcon && <p className="error">アイコンを選ぶか、表示を「文字のみ」にしてください</p>}
+				<div className="form-actions">
+					<button type="button" className="ghost" onClick={onClose}>キャンセル</button>
+					<button type="submit" disabled={!label.trim() || needsIcon}>保存</button>
+				</div>
+			</form>
+		</Modal>
+	)
 }
 
 // members はグループを動かすときに一緒に動かすウィジェット（ドラッグ開始時の位置）
@@ -93,6 +232,7 @@ function LayoutEditor({ layout, layouts, onLogout, onCreate, onDelete, onRename 
 	// コンパクト表示は使うだけ（縮小表示ではドラッグの位置がずれるので編集は通常の画面で行う）
 	const [editing, setEditing] = React.useState(!COMPACT && layout.widgets.length === 0)
 	const [activeId, setActiveId] = React.useState<string | null>(null)
+	const [editingWidgetId, setEditingWidgetId] = React.useState<string | null>(null)
 	const [busy, setBusy] = React.useState<string | null>(null)
 	const [refreshing, setRefreshing] = React.useState(false)
 	const [saveState, setSaveState] = React.useState<SaveState>('saved')
@@ -214,6 +354,7 @@ function LayoutEditor({ layout, layouts, onLogout, onCreate, onDelete, onRename 
 			targetId,
 			command: kind === 'action' ? command : null,
 			label: kind === 'action' ? `${name} ${actionLabel ?? command}` : name,
+			icon: kind === 'action' && target.device ? suggestIcon(target.device, command) : null,
 			x: GRID * 2,
 			y: widgets.length ? bottom + GRID * 2 : GRID * 2,
 			w: Math.max(MIN_W, Math.min(size.w, maxRight - GRID * 2)),
@@ -246,10 +387,11 @@ function LayoutEditor({ layout, layouts, onLogout, onCreate, onDelete, onRename 
 
 	const removeWidget = (id: string) => updateWidgets(items => items.filter(w => w.id !== id))
 
-	const renameWidget = (widget: Widget) => {
-		const label = window.prompt('表示名', widget.label)
-		if (label === null) return
-		updateWidgets(items => items.map(w => (w.id === widget.id ? { ...w, label: label.trim() || w.label } : w)))
+	const editingWidget = widgets.find(w => w.id === editingWidgetId)
+
+	const saveWidget = (id: string, patch: Partial<Widget>) => {
+		updateWidgets(items => items.map(w => (w.id === id ? { ...w, ...patch } : w)))
+		setEditingWidgetId(null)
 	}
 
 	const startDrag = (e: React.PointerEvent, widget: Widget, mode: Drag['mode']) => {
@@ -456,9 +598,14 @@ function LayoutEditor({ layout, layouts, onLogout, onCreate, onDelete, onRename 
 											{device ? <StatusView device={device} entry={statuses[device.id]} /> : <p className="status muted">{missing ? '機器が見つかりません' : '読み込み中...'}</p>}
 										</>
 									) : (
-										<button className="widget-button" onClick={() => runWidget(widget)} disabled={editing || busy !== null || missing}>
-											{widget.kind === 'scene' && <Play size={14} />}
-											<span>{widget.label}</span>
+										<button
+											className="widget-button"
+											onClick={() => runWidget(widget)}
+											disabled={editing || busy !== null || missing}
+											title={widget.label}
+											aria-label={widget.label}
+										>
+											<ButtonContent widget={widget} />
 											{missing && <small>（見つかりません）</small>}
 										</button>
 									)}
@@ -466,7 +613,13 @@ function LayoutEditor({ layout, layouts, onLogout, onCreate, onDelete, onRename 
 								{editing && (
 									<>
 										<div className="widget-tools" onPointerDown={e => e.stopPropagation()}>
-											<button className="icon" onClick={() => renameWidget(widget)} title="表示名を変更"><Type size={12} /></button>
+											<button
+												className="icon"
+												onClick={() => setEditingWidgetId(widget.id)}
+												title={isButton(widget) ? '表示名・アイコンを変更' : '表示名を変更'}
+											>
+												{isButton(widget) ? <Pencil size={12} /> : <Type size={12} />}
+											</button>
 											<button className="icon" onClick={() => removeWidget(widget.id)} title="削除"><Trash2 size={12} /></button>
 										</div>
 										<div className="widget-resize" onPointerDown={e => startDrag(e, widget, 'resize')} title="ドラッグでサイズ変更" />
@@ -478,6 +631,15 @@ function LayoutEditor({ layout, layouts, onLogout, onCreate, onDelete, onRename 
 					</div>
 				</div>
 			</div>
+
+			{editingWidget && (
+				<WidgetEditor
+					key={editingWidget.id}
+					widget={editingWidget}
+					onSave={patch => saveWidget(editingWidget.id, patch)}
+					onClose={() => setEditingWidgetId(null)}
+				/>
+			)}
 
 			{toastElement}
 		</main>

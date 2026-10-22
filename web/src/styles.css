@@ -420,6 +420,25 @@ main.layout-page {
 .widget-button:disabled {
   opacity: 1;
 }
+.button-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+}
+.button-content svg {
+  flex-shrink: 0;
+}
+/* 縦長のボタンではアイコンを文字の上に置く */
+.button-content.stacked {
+  flex-direction: column;
+  gap: 4px;
+}
+.button-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .canvas:not(.editing) .widget-button:active:not(:disabled) {
   background: #1a1a1a;
 }
@@ -604,6 +623,78 @@ input.switch:checked::after {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+/* レイアウトのボタン編集（アイコン選択） */
+.modal.widget-editor {
+  width: min(640px, 100%);
+}
+.form label small {
+  font-size: 11px;
+}
+.icon-search {
+  position: relative;
+}
+.form .icon-search {
+  flex-direction: row;
+  align-items: center;
+}
+.icon-search svg {
+  position: absolute;
+  left: 10px;
+  color: var(--muted);
+  pointer-events: none;
+}
+.icon-search input {
+  flex: 1;
+  padding-left: 30px;
+}
+.icon-picker {
+  max-height: min(320px, 40dvh);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 4px;
+}
+.icon-picker h3 {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  margin: 0 0 4px;
+}
+.icon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: 4px;
+}
+.icon-option {
+  justify-content: center;
+  height: 40px;
+  padding: 0;
+}
+.icon-option.active {
+  border-color: var(--green);
+  color: var(--green);
+  background: #8ff0ad14;
+}
+.icon-none {
+  font-size: 11px;
+  color: var(--muted);
+}
+.icon-option.active .icon-none {
+  color: var(--green);
+}
+.widget-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.widget-preview-button {
+  display: flex;
+  max-width: 100%;
+}
+.widget-preview-button .widget-button {
+  cursor: default;
 }
 /* API 呼び出し回数は画面右下に小さく固定表示する（クリックの邪魔をしない） */
 .usage-label {

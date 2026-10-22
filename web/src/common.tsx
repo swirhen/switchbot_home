@@ -212,6 +212,28 @@ export function useHash() {
 	return hash
 }
 
+// 画面中央のダイアログ。外側をクリックするか Esc で閉じる
+export function Modal({ title, onClose, children, className = '' }: {
+	title: string
+	onClose: () => void
+	children: React.ReactNode
+	className?: string
+}) {
+	React.useEffect(() => {
+		const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+		window.addEventListener('keydown', onKey)
+		return () => window.removeEventListener('keydown', onKey)
+	}, [onClose])
+	return (
+		<div className="modal-backdrop" onPointerDown={e => e.target === e.currentTarget && onClose()}>
+			<div className={`modal ${className}`.trim()} role="dialog" aria-label={title}>
+				<h2>{title}</h2>
+				{children}
+			</div>
+		</div>
+	)
+}
+
 export type MenuItem = { key: string; label: React.ReactNode; onSelect: () => void; active?: boolean; disabled?: boolean; separator?: boolean }
 
 // ヘッダーの切り替えメニューに出すレイアウト（中身は layout.tsx 側で扱う）

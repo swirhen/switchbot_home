@@ -83,6 +83,10 @@ class Widget(BaseModel):
     targetId: str = ''
     command: str | None = None
     label: str = ''
+    # ボタンのアイコン（web/src/icons.tsx の key）。None は種類ごとの既定（シーンは再生、機器の操作はなし）
+    icon: str | None = Field(default=None, max_length=40)
+    # ボタンの表示（both: アイコンと文字、icon: アイコンのみ、text: 文字のみ）。None はアイコンがあれば both
+    display: Literal['both', 'icon', 'text'] | None = None
     x: int
     y: int
     w: int

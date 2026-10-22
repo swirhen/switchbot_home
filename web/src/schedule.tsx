@@ -1,7 +1,7 @@
 import React from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
-import { Device, DevicesResponse, Header, Scene, UnauthorizedError, api, deviceActions, errorMessage, useToast } from './common'
+import { Device, DevicesResponse, Header, Modal, Scene, UnauthorizedError, api, deviceActions, errorMessage, useToast } from './common'
 
 type DayMode = 'everyday' | 'weekday' | 'holiday' | 'days'
 
@@ -146,22 +146,6 @@ function ActionSelect({ value, onChange, devices, scenes, noneLabel }: {
 				</optgroup>
 			))}
 		</select>
-	)
-}
-
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-	React.useEffect(() => {
-		const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-		window.addEventListener('keydown', onKey)
-		return () => window.removeEventListener('keydown', onKey)
-	}, [onClose])
-	return (
-		<div className="modal-backdrop" onPointerDown={e => e.target === e.currentTarget && onClose()}>
-			<div className="modal" role="dialog" aria-label={title}>
-				<h2>{title}</h2>
-				{children}
-			</div>
-		</div>
 	)
 }
 
