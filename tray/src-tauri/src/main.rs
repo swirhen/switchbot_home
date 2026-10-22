@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent};
+use tauri::{AppHandle, Manager, PhysicalPosition, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_positioner::{Position, WindowExt};
@@ -87,25 +87,61 @@ fn watch_focus_lost(app: &AppHandle) {
     });
 }
 
-/// 窓をトレイの上に出す。hash を渡すとそのページ（#/layout など）に移る
-fn show(app: &AppHandle, hash: Option<&str>) {
+/// 窓を出す場所
+#[derive(Clone, Copy)]
+enum Placement {
+    /// トレイアイコンの上
+    Tray,
+    /// マウスカーソルのある画面（タスクバーのアイコンなど、実行ファイルから起動されたとき）
+    Cursor,
+}
+
+/// マウスカーソルのある画面に窓を置く。カーソルがタスクバーの上（作業領域の外）ならその近くに、
+/// 画面の中なら作業領域の右下に置く。どの向きのタスクバーでも、作業領域に収めればタスクバーの隣になる
+fn move_to_cursor_monitor(app: &AppHandle, window: &WebviewWindow) -> Option<()> {
+    let cursor = app.cursor_position().ok()?;
+    let monitor = app.monitor_from_point(cursor.x, cursor.y).ok()??;
+    let area = monitor.work_area();
+    // 拡大率の違う画面へ移すと、移した先の拡大率で大きさが変わる
+    let size = window.outer_size().ok()?;
+    let scale = monitor.scale_factor() / window.scale_factor().ok()?;
+    let (width, height) = ((size.width as f64 * scale) as i32, (size.height as f64 * scale) as i32);
+    let (left, top) = (area.position.x, area.position.y);
+    let (right, bottom) = (left + area.size.width as i32, top + area.size.height as i32);
+    let (cx, cy) = (cursor.x as i32, cursor.y as i32);
+    let on_work_area = (left..right).contains(&cx) && (top..bottom).contains(&cy);
+    let (x, y) = if on_work_area {
+        (right - width, bottom - height)
+    } else {
+        (cx - width / 2, cy - height / 2)
+    };
+    let x = x.clamp(left, (right - width).max(left));
+    let y = y.clamp(top, (bottom - height).max(top));
+    window.set_position(PhysicalPosition::new(x, y)).ok()
+}
+
+/// 窓を出す。hash を渡すとそのページ（#/layout など）に移る
+fn show(app: &AppHandle, hash: Option<&str>, placement: Placement) {
     let Some(window) = main_window(app) else { return };
     if let Some(hash) = hash {
         let _ = window.eval(&format!("location.hash = {hash:?}"));
     }
-    let position = if app.state::<TrayState>().tray_known.load(Ordering::Relaxed) {
-        Position::TrayCenter
-    } else {
-        Position::BottomRight
-    };
-    let _ = window.move_window(position);
+    let placed = matches!(placement, Placement::Cursor) && move_to_cursor_monitor(app, &window).is_some();
+    if !placed {
+        let position = if app.state::<TrayState>().tray_known.load(Ordering::Relaxed) {
+            Position::TrayCenter
+        } else {
+            Position::BottomRight
+        };
+        let _ = window.move_window(position);
+    }
     let _ = window.show();
     let _ = window.set_focus();
 }
 
 /// 開いていれば隠し、隠れていれば出す。
 /// クリックした時点で窓は前面でなくなり隠れるため、guard 以内に隠れたばかりなら開いていたものとして出さない
-fn toggle(app: &AppHandle, guard: Duration) {
+fn toggle(app: &AppHandle, guard: Duration, placement: Placement) {
     let Some(window) = main_window(app) else { return };
     if window.is_visible().unwrap_or(false) {
         hide(app);
@@ -118,7 +154,7 @@ fn toggle(app: &AppHandle, guard: Duration) {
         .unwrap()
         .is_some_and(|at| at.elapsed() < guard);
     if !just_hidden {
-        show(app, None);
+        show(app, None, placement);
     }
 }
 
@@ -139,7 +175,9 @@ fn main() {
     allow_foreground_for_running_instance();
     tauri::Builder::default()
         // 2つ目を起動しようとしたら（タスクバーのアイコンなど）、動いている方の窓を開閉する
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| toggle(app, LAUNCH_REOPEN_GUARD)))
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            toggle(app, LAUNCH_REOPEN_GUARD, Placement::Cursor)
+        }))
         .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .plugin(tauri_plugin_opener::init())
@@ -209,10 +247,10 @@ fn main() {
                 // 左クリックは窓の開閉、右クリックでメニュー
                 .show_menu_on_left_click(false)
                 .on_menu_event(move |app, event| match event.id().as_ref() {
-                    "open" => show(app, None),
-                    "layout" => show(app, Some("#/layout")),
-                    "schedule" => show(app, Some("#/schedule")),
-                    "dashboard" => show(app, Some("#/")),
+                    "open" => show(app, None, Placement::Tray),
+                    "layout" => show(app, Some("#/layout"), Placement::Tray),
+                    "schedule" => show(app, Some("#/schedule"), Placement::Tray),
+                    "dashboard" => show(app, Some("#/"), Placement::Tray),
                     "browser" => {
                         let _ = app.opener().open_url(format!("{}#/layout", base_url()), None::<&str>);
                     }
@@ -238,7 +276,7 @@ fn main() {
                         ..
                     } = event
                     {
-                        toggle(app, REOPEN_GUARD);
+                        toggle(app, REOPEN_GUARD, Placement::Tray);
                     }
                 })
                 .build(app)?;
