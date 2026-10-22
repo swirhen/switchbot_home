@@ -207,6 +207,35 @@ const ICONS = new Map(ICON_GROUPS.flatMap(g => g.icons).map(def => [def.key, def
 
 export const findIcon = (key: string | null | undefined) => (key ? ICONS.get(key) : undefined)
 
+// 新しく置く状態表示のタイトルに最初から付けるアイコン（機器の種類から選ぶ）
+export function suggestStatusIcon(device: Device): string | null {
+	const t = device.type
+	if (device.kind === 'ir') {
+		if (/Air Conditioner/i.test(t)) return 'air-vent'
+		if (/TV|Set Top Box|Projector|Streamer/i.test(t)) return 'tv'
+		if (/Light/i.test(t)) return 'lightbulb'
+		if (/Fan/i.test(t)) return 'fan'
+		if (/Speaker/i.test(t)) return 'speaker'
+		return null
+	}
+	if (/Lock/i.test(t)) return 'lock'
+	if (/Keypad/i.test(t)) return 'key-round'
+	if (/Meter|Thermo|Hygro/i.test(t)) return 'thermometer'
+	if (/Curtain|Roller Shade|Blind Tilt/i.test(t)) return 'blinds'
+	if (/Light|Bulb|Strip|Lamp|Ceiling/i.test(t)) return 'lightbulb'
+	if (/Humidifier/i.test(t)) return 'droplet'
+	if (/Purifier/i.test(t)) return 'waves'
+	if (/Fan/i.test(t)) return 'fan'
+	if (/Plug|Relay/i.test(t)) return 'plug'
+	if (/Motion/i.test(t)) return 'person-standing'
+	if (/Contact/i.test(t)) return 'door-closed'
+	if (/Water Detector|Leak/i.test(t)) return 'droplets'
+	if (/Camera/i.test(t)) return 'cctv'
+	if (/Bot/i.test(t)) return 'bot'
+	if (/Hub/i.test(t)) return 'router'
+	return null
+}
+
 // 新しく置く操作ボタンに最初から付けるアイコン（機器の種類と操作から選ぶ）
 export function suggestIcon(device: Device, command: string): string | null {
 	const t = device.type

@@ -5,7 +5,7 @@ import {
 	COMPACT, Device, DevicesResponse, Header, Modal, PopupMenu, layoutLabel, layoutPath, Scene, StatusesResponse, StatusView, UnauthorizedError,
 	api, deviceActions, errorMessage, executeScene, hasStatus, sendCommand, useHash, useToast,
 } from './common'
-import { ICON_GROUPS, findIcon, suggestIcon } from './icons'
+import { ICON_GROUPS, findIcon, suggestIcon, suggestStatusIcon } from './icons'
 
 type WidgetKind = 'status' | 'action' | 'scene' | 'group'
 
@@ -32,6 +32,9 @@ const DISPLAY_LABELS: Record<ButtonDisplay, string> = { both: 'アイコンと�
 
 const isButton = (widget: Widget) => widget.kind === 'action' || widget.kind === 'scene'
 
+// アイコンを付けられるもの（ボタンと状態表示のタイトル）
+const hasIcon = (widget: Widget) => widget.kind !== 'group'
+
 const widgetIconKey = (widget: Pick<Widget, 'kind' | 'icon'>) => widget.icon ?? (widget.kind === 'scene' ? 'play' : null)
 
 // アイコンが無いときは、表示の指定にかかわらず文字を出す
@@ -56,9 +59,22 @@ function ButtonContent({ widget }: { widget: Pick<Widget, 'kind' | 'icon' | 'dis
 	)
 }
 
-// 表示名・アイコン・表示の仕方を編集する。ボタン以外（状態表示・グループ）は表示名だけ
+// 状態表示のタイトル。アイコンは文字と同じくらいの大きさで左に置く
+function TitleContent({ widget }: { widget: Pick<Widget, 'kind' | 'icon' | 'display' | 'label'> }) {
+	const display = widgetDisplay(widget)
+	const Icon = display === 'text' ? undefined : findIcon(widgetIconKey(widget))?.Icon
+	return (
+		<span className="title-content">
+			{Icon && <Icon size={display === 'icon' ? 20 : 16} aria-hidden="true" />}
+			{display !== 'icon' && <span>{widget.label}</span>}
+		</span>
+	)
+}
+
+// 表示名・アイコン・表示の仕方を編集する。グループは表示名だけ
 function WidgetEditor({ widget, onSave, onClose }: { widget: Widget; onSave: (patch: Partial<Widget>) => void; onClose: () => void }) {
 	const button = isButton(widget)
+	const iconEditable = hasIcon(widget)
 	const [label, setLabel] = React.useState(widget.label)
 	const [icon, setIcon] = React.useState<string | null>(widgetIconKey(widget))
 	const [display, setDisplay] = React.useState<ButtonDisplay>(widgetDisplay(widget))
@@ -79,17 +95,21 @@ function WidgetEditor({ widget, onSave, onClose }: { widget: Widget; onSave: (pa
 	const submit = (e: React.FormEvent) => {
 		e.preventDefault()
 		if (!label.trim() || needsIcon) return
-		onSave(button ? { label: label.trim(), icon, display } : { label: label.trim() })
+		onSave(iconEditable ? { label: label.trim(), icon, display } : { label: label.trim() })
 	}
 
 	const preview = { kind: widget.kind, icon, display, label: label.trim() || '（表示名）', w: widget.w, h: widget.h }
+	const title = button ? 'ボタンを編集' : iconEditable ? '状態表示を編集' : '表示名を変更'
+	const labelNote = button
+		? 'アイコンのみの表示でも、操作したときの通知とマウスを載せたときの説明に使います'
+		: 'アイコンのみの表示でも、マウスを載せたときの説明に使います'
 	return (
-		<Modal title={button ? 'ボタンを編集' : '表示名を変更'} onClose={onClose} className={button ? 'widget-editor' : ''}>
+		<Modal title={title} onClose={onClose} className={iconEditable ? 'widget-editor' : ''}>
 			<form className="form" onSubmit={submit}>
-				<label>表示名{button && <small>アイコンのみの表示でも、操作したときの通知とマウスを載せたときの説明に使います</small>}
+				<label>表示名{iconEditable && <small>{labelNote}</small>}
 					<input value={label} onChange={e => setLabel(e.target.value)} autoFocus maxLength={60} />
 				</label>
-				{button && (
+				{iconEditable && (
 					<>
 						<fieldset>
 							<legend>表示</legend>
@@ -141,11 +161,17 @@ function WidgetEditor({ widget, onSave, onClose }: { widget: Widget; onSave: (pa
 						</fieldset>
 						<div className="widget-preview">
 							<small>プレビュー</small>
-							<div className="widget-preview-button" style={{ width: Math.min(widget.w, 300), height: Math.min(widget.h, 160) }}>
-								<button type="button" className="widget-button" tabIndex={-1} aria-hidden="true">
-									<ButtonContent widget={{ ...preview, w: Math.min(widget.w, 300), h: Math.min(widget.h, 160) }} />
-								</button>
-							</div>
+							{button ? (
+								<div className="widget-preview-button" style={{ width: Math.min(widget.w, 300), height: Math.min(widget.h, 160) }}>
+									<button type="button" className="widget-button" tabIndex={-1} aria-hidden="true">
+										<ButtonContent widget={{ ...preview, w: Math.min(widget.w, 300), h: Math.min(widget.h, 160) }} />
+									</button>
+								</div>
+							) : (
+								<div className="widget-preview-title" style={{ width: Math.min(widget.w, 300) }}>
+									<div className="widget-title"><TitleContent widget={preview} /></div>
+								</div>
+							)}
 						</div>
 					</>
 				)}
@@ -354,7 +380,7 @@ function LayoutEditor({ layout, layouts, onLogout, onCreate, onDelete, onRename 
 			targetId,
 			command: kind === 'action' ? command : null,
 			label: kind === 'action' ? `${name} ${actionLabel ?? command}` : name,
-			icon: kind === 'action' && target.device ? suggestIcon(target.device, command) : null,
+			icon: !target.device ? null : kind === 'action' ? suggestIcon(target.device, command) : kind === 'status' ? suggestStatusIcon(target.device) : null,
 			x: GRID * 2,
 			y: widgets.length ? bottom + GRID * 2 : GRID * 2,
 			w: Math.max(MIN_W, Math.min(size.w, maxRight - GRID * 2)),
@@ -594,7 +620,7 @@ function LayoutEditor({ layout, layouts, onLogout, onCreate, onDelete, onRename 
 										<div className="widget-title">{widget.label}</div>
 									) : widget.kind === 'status' ? (
 										<>
-											<div className="widget-title">{widget.label}</div>
+											<div className="widget-title" title={widget.label}><TitleContent widget={widget} /></div>
 											{device ? <StatusView device={device} entry={statuses[device.id]} /> : <p className="status muted">{missing ? '機器が見つかりません' : '読み込み中...'}</p>}
 										</>
 									) : (
@@ -616,9 +642,9 @@ function LayoutEditor({ layout, layouts, onLogout, onCreate, onDelete, onRename 
 											<button
 												className="icon"
 												onClick={() => setEditingWidgetId(widget.id)}
-												title={isButton(widget) ? '表示名・アイコンを変更' : '表示名を変更'}
+												title={hasIcon(widget) ? '表示名・アイコンを変更' : '表示名を変更'}
 											>
-												{isButton(widget) ? <Pencil size={12} /> : <Type size={12} />}
+												{hasIcon(widget) ? <Pencil size={12} /> : <Type size={12} />}
 											</button>
 											<button className="icon" onClick={() => removeWidget(widget.id)} title="削除"><Trash2 size={12} /></button>
 										</div>

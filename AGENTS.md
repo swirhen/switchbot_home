@@ -12,7 +12,7 @@
 - `web/api.py`: ログイン認証、機器一覧・状態（キャッシュ付き）、コマンド送信、一括操作、シーン実行。
 - `web/src/main.tsx`: ログイン画面、一覧ページ（`#/`）、ハッシュによるページ切り替え。
 - `web/src/layout.tsx`: レイアウトページ（`#/layout/<名前 または id>`、複数持てる。名前は重複不可）。機器・シーンのボタンや状態表示をキャンバスに置き、ドラッグで移動・リサイズする。
-- `web/src/icons.tsx`: レイアウトのボタンで選べるアイコン（lucide-react）の一覧と、新しく置く操作ボタンに付ける既定のアイコン。key は `layout.json` に保存するので変えない。ボタンの `icon` が null のときは種類ごとの既定（シーンは再生、機器の操作はなし）、`display`（both / icon / text）が null のときはアイコンがあれば both。
+- `web/src/icons.tsx`: レイアウトのボタンと状態表示のタイトルで選べるアイコン（lucide-react）の一覧と、新しく置くときに付ける既定のアイコン。key は `layout.json` に保存するので変えない。ボタンの `icon` が null のときは種類ごとの既定（シーンは再生、機器の操作はなし）、`display`（both / icon / text）が null のときはアイコンがあれば both。
 - `web/src/common.tsx`: API 呼び出し、型、ヘッダー、状態表示など共通部品。機器タイプごとの操作ボタンは `deviceActions()` で決める。
 - `web/src/schedule.tsx`: スケジュールページ（`#/schedule`）。スケジュールと外出予定の表、追加・編集フォーム。
 - `web/scheduler.py`: スケジュールの判定（日付条件・翌日にまたがる時間・外出予定・祝日は `jpholiday`）と、毎分の実行ループ。

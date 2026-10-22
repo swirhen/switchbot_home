@@ -435,6 +435,22 @@ main.layout-page {
   flex-direction: column;
   gap: 4px;
 }
+.title-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.title-content svg {
+  flex-shrink: 0;
+}
+.widget-preview-title {
+  max-width: 100%;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
 .button-label {
   min-width: 0;
   overflow-wrap: anywhere;
