@@ -535,6 +535,51 @@ tbody tr:last-child td {
 tr.disabled td:not(:first-child) {
   opacity: 0.45;
 }
+/* 幅の狭い画面のスケジュール表。関連する列を 2 行にまとめ、文字・余白・スイッチ・ボタンを小さくして横に収める */
+table.narrow-table {
+  font-size: 11px;
+}
+table.narrow-table th,
+table.narrow-table td {
+  padding: 4px 5px;
+  line-height: 1.35;
+}
+table.narrow-table th {
+  font-size: 10px;
+}
+/* 名前が 1 文字ずつ折り返さないようにする */
+table.narrow-table td:nth-child(2) {
+  min-width: 4.5em;
+}
+/* まとめた列の 2 行目は少しだけ控えめにする */
+table.narrow-table td > div + div {
+  color: #cfcfcf;
+}
+/* 日時は空白の位置でだけ折り返す（「10/24(土)」の途中で切らない） */
+table.narrow-table td.runs {
+  white-space: normal;
+  word-break: keep-all;
+}
+table.narrow-table input.switch {
+  width: 28px;
+  height: 16px;
+}
+table.narrow-table input.switch::after {
+  width: 12px;
+  height: 12px;
+}
+table.narrow-table input.switch:checked::after {
+  left: 14px;
+}
+/* 編集・削除は縦に並べて幅を取らない */
+table.narrow-table .row-actions {
+  width: 1px;
+}
+table.narrow-table .row-actions .icon {
+  display: flex;
+  padding: 3px;
+  margin: 2px 0 2px auto;
+}
 .nowrap {
   white-space: nowrap;
 }

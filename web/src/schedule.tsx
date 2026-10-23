@@ -301,6 +301,20 @@ function OutingForm({ initial, isNew, schedules, onSave, onClose }: {
 	)
 }
 
+// 画面（ポップアップ）の幅がこれ以下なら、スケジュール表の列を 2 行ずつにまとめ、文字を小さくする
+const NARROW_QUERY = '(max-width: 760px)'
+
+function useMediaQuery(query: string) {
+	return React.useSyncExternalStore(
+		onChange => {
+			const media = window.matchMedia(query)
+			media.addEventListener('change', onChange)
+			return () => media.removeEventListener('change', onChange)
+		},
+		() => window.matchMedia(query).matches,
+	)
+}
+
 export function SchedulePage({ onLogout }: { onLogout: () => void }) {
 	const queryClient = useQueryClient()
 	const { showToast, toastElement } = useToast()
@@ -410,6 +424,7 @@ export function SchedulePage({ onLogout }: { onLogout: () => void }) {
 	}
 
 	const sortedSchedules = [...schedules].sort((a, b) => a.start.localeCompare(b.start))
+	const narrow = useMediaQuery(NARROW_QUERY)
 	const sortedOutings = [...outings].sort((a, b) => a.start.localeCompare(b.start))
 	const today = data?.status.today
 
@@ -433,37 +448,51 @@ export function SchedulePage({ onLogout }: { onLogout: () => void }) {
 					<button onClick={() => setEditingSchedule(newSchedule())} disabled={!data}><Plus size={16} /> 追加</button>
 				</div>
 				<div className="table-wrap">
-					<table>
+					<table className={narrow ? 'narrow-table' : ''}>
 						<thead>
-							<tr><th>有効</th><th>名前</th><th>日付</th><th>時間</th><th>開始時の操作</th><th>終了時の操作</th><th>次回</th><th>最終実行</th><th></th></tr>
+							{narrow ? (
+								<tr><th>有効</th><th>名前</th><th>日付<br />時間</th><th>開始時の操作<br />終了時の操作</th><th>次回<br />最終実行</th><th></th></tr>
+							) : (
+								<tr><th>有効</th><th>名前</th><th>日付</th><th>時間</th><th>開始時の操作</th><th>終了時の操作</th><th>次回</th><th>最終実行</th><th></th></tr>
+							)}
 						</thead>
 						<tbody>
 							{sortedSchedules.map(s => {
 								const last = data?.lastRuns[s.id]
+								const endAction = s.end ? actionLabel(s.endAction) : <span className="muted">—</span>
+								const lastRun = last ? (
+									<span title={last.message}>
+										{runLabel(last)} <span className={last.result === 'ok' ? 'power-on' : last.result === 'error' ? 'error' : 'muted'}>{RESULT_LABELS[last.result]}</span>
+									</span>
+								) : '—'
 								return (
 									<tr key={s.id} className={s.enabled ? '' : 'disabled'}>
 										<td><input type="checkbox" className="switch" checked={s.enabled} onChange={() => toggleSchedule(s)} disabled={saving} aria-label="有効" /></td>
 										<td>{s.name || <span className="muted">（名前なし）</span>}</td>
-										<td>{dayLabel(s)}</td>
-										<td className="nowrap">{timeLabel(s)}</td>
-										<td>{actionLabel(s.startAction)}</td>
-										<td>{s.end ? actionLabel(s.endAction) : <span className="muted">—</span>}</td>
-										<td className="nowrap">{runLabel(data?.nextRuns[s.id])}</td>
-										<td className="nowrap">
-											{last ? (
-												<span title={last.message}>
-													{runLabel(last)} <span className={last.result === 'ok' ? 'power-on' : last.result === 'error' ? 'error' : 'muted'}>{RESULT_LABELS[last.result]}</span>
-												</span>
-											) : '—'}
-										</td>
+										{narrow ? (
+											<>
+												<td><div>{dayLabel(s)}</div><div className="nowrap">{timeLabel(s)}</div></td>
+												<td><div>{actionLabel(s.startAction)}</div><div>{endAction}</div></td>
+												<td className="runs"><div>{runLabel(data?.nextRuns[s.id])}</div><div>{lastRun}</div></td>
+											</>
+										) : (
+											<>
+												<td>{dayLabel(s)}</td>
+												<td className="nowrap">{timeLabel(s)}</td>
+												<td>{actionLabel(s.startAction)}</td>
+												<td>{endAction}</td>
+												<td className="nowrap">{runLabel(data?.nextRuns[s.id])}</td>
+												<td className="nowrap">{lastRun}</td>
+											</>
+										)}
 										<td className="row-actions">
-											<button className="icon" onClick={() => setEditingSchedule(s)} title="編集"><Pencil size={14} /></button>
-											<button className="icon" onClick={() => deleteSchedule(s)} title="削除" disabled={saving}><Trash2 size={14} /></button>
+											<button className="icon" onClick={() => setEditingSchedule(s)} title="編集"><Pencil size={narrow ? 12 : 14} /></button>
+											<button className="icon" onClick={() => deleteSchedule(s)} title="削除" disabled={saving}><Trash2 size={narrow ? 12 : 14} /></button>
 										</td>
 									</tr>
 								)
 							})}
-							{data && schedules.length === 0 && <tr><td colSpan={9} className="muted">スケジュールはまだありません</td></tr>}
+							{data && schedules.length === 0 && <tr><td colSpan={narrow ? 6 : 9} className="muted">スケジュールはまだありません</td></tr>}
 						</tbody>
 					</table>
 				</div>
