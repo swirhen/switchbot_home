@@ -302,7 +302,7 @@ function OutingForm({ initial, isNew, schedules, onSave, onClose }: {
 }
 
 // 画面（ポップアップ）の幅がこれ以下なら、スケジュール表の列を 2 行ずつにまとめ、文字を小さくする
-const NARROW_QUERY = '(max-width: 760px)'
+const NARROW_QUERY = '(max-width: 900px)'
 
 function useMediaQuery(query: string) {
 	return React.useSyncExternalStore(

@@ -543,6 +543,19 @@ tbody tr:last-child td {
 tr.disabled td:not(:first-child) {
   opacity: 0.45;
 }
+/* やや狭い画面の表（スケジュール・外出予定）。列はそのままで、文字と余白を少し小さくする（900px 以下はさらに narrow-font） */
+@media (max-width: 1200px) {
+  table {
+    font-size: 12.5px;
+  }
+  th,
+  td {
+    padding: 6px 8px;
+  }
+  th {
+    font-size: 11px;
+  }
+}
 /* 幅の狭い画面の表（スケジュール・外出予定）。文字と余白を小さくする */
 table.narrow-font {
   font-size: 11px;
