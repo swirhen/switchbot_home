@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Copy, Pencil, Plus, RefreshCw, Search, Trash2, Type } from 'lucide-react'
 import {
 	COMPACT, Device, DevicesResponse, Header, Modal, PopupMenu, layoutLabel, layoutPath, Scene, StatusesResponse, StatusView, UnauthorizedError,
-	api, deviceActions, errorMessage, executeScene, hasStatus, sendCommand, useHash, useToast,
+	api, deviceActions, errorMessage, executeScene, getLastLayoutId, hasStatus, sendCommand, setLastLayoutId, useHash, useToast,
 } from './common'
 import { ICON_GROUPS, findIcon, suggestIcon, suggestStatusIcon } from './icons'
 
@@ -280,7 +280,6 @@ type LayoutDoc = { id: string; name: string; widgets: Widget[] }
 
 type LayoutsResponse = { layouts: LayoutDoc[] }
 
-const LAST_LAYOUT_KEY = 'switchbot_home_last_layout'
 
 
 
@@ -764,23 +763,13 @@ export function LayoutPage({ onLogout }: { onLogout: () => void }) {
 	} catch {
 		requestedKey = requested
 	}
-	let lastId: string | null = null
-	try {
-		lastId = localStorage.getItem(LAST_LAYOUT_KEY)
-	} catch {
-		// localStorage error
-	}
+	const lastId = getLastLayoutId()
 	// URL の指定（名前 → id） → 最後に開いたレイアウト → 先頭の順に開く
 	const current = (requestedKey && (layouts.find(l => l.name === requestedKey) ?? layouts.find(l => l.id === requestedKey)))
 		|| layouts.find(l => l.id === lastId) || layouts[0]
 
 	React.useEffect(() => {
-		if (!current) return
-		try {
-			localStorage.setItem(LAST_LAYOUT_KEY, current.id)
-		} catch {
-			// localStorage error
-		}
+		if (current) setLastLayoutId(current.id)
 	}, [current?.id])
 
 	const handleError = (err: unknown) => {

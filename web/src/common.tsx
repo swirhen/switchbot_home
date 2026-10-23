@@ -241,6 +241,25 @@ export type LayoutSummary = { id: string; name: string }
 
 export const layoutLabel = (layout: LayoutSummary, index: number) => layout.name || `レイアウト ${index + 1}`
 
+// 最後に開いたレイアウト。レイアウトページを開き直すときと、他のページからレイアウトに戻るときに使う
+const LAST_LAYOUT_KEY = 'switchbot_home_last_layout'
+
+export function getLastLayoutId(): string | null {
+	try {
+		return localStorage.getItem(LAST_LAYOUT_KEY)
+	} catch {
+		return null
+	}
+}
+
+export function setLastLayoutId(id: string) {
+	try {
+		localStorage.setItem(LAST_LAYOUT_KEY, id)
+	} catch {
+		// localStorage error
+	}
+}
+
 // URL では名前があれば名前、無ければ id で指す
 export const layoutPath = (layout: LayoutSummary) => `#/layout/${encodeURIComponent(layout.name || layout.id)}`
 
@@ -305,7 +324,7 @@ export function Header({ page, onLogout, currentLayoutId, layoutMenuLabel, onCre
 	onCreateLayout?: () => void
 	children?: React.ReactNode
 }) {
-	// どのページでも切り替えメニューを開けるよう、レイアウトの一覧はヘッダーでも読む（SwitchBot API は呼ばない）
+	// 切り替えメニューと、他のページから戻るリンクの名前に使うので、レイアウトの一覧はヘッダーでも読む（SwitchBot API は呼ばない）
 	const layoutsQuery = useQuery({ queryKey: ['layouts'], queryFn: () => api<{ layouts: LayoutSummary[] }>('/layouts'), retry: false })
 	const layouts = layoutsQuery.data?.layouts ?? []
 	const menu: MenuItem[] = [
@@ -318,7 +337,9 @@ export function Header({ page, onLogout, currentLayoutId, layoutMenuLabel, onCre
 		})),
 		{ key: 'dashboard', label: '一覧', active: page === 'dashboard', separator: true, onSelect: () => { window.location.hash = '#/' } },
 	]
-	const menuLabel = page === 'layout' ? layoutMenuLabel ?? 'レイアウト' : page === 'dashboard' ? '一覧' : 'レイアウト'
+	// レイアウト以外のページでは、ボタンを最後に開いたレイアウトへ戻るリンクにする（切り替えメニューはレイアウトページでだけ開く）
+	const lastIndex = Math.max(0, layouts.findIndex(l => l.id === getLastLayoutId()))
+	const lastLayout = layouts[lastIndex]
 	return (
 		<header>
 			<div className="title-row">
@@ -329,11 +350,17 @@ export function Header({ page, onLogout, currentLayoutId, layoutMenuLabel, onCre
 				</h1>
 				<nav>
 					{/* 一覧ページへはこのメニューの一番下から移る */}
-					<PopupMenu
-						label={<><span className="nav-current">{menuLabel}</span><ChevronDown size={12} /></>}
-						className={page === 'schedule' ? 'nav-button' : 'nav-button active'}
-						items={menu}
-					/>
+					{page === 'layout' ? (
+						<PopupMenu
+							label={<><span className="nav-current">{layoutMenuLabel ?? 'レイアウト'}</span><ChevronDown size={12} /></>}
+							className="nav-button active"
+							items={menu}
+						/>
+					) : (
+						<a href={lastLayout ? layoutPath(lastLayout) : '#/layout'} className="nav-link" title="レイアウトに戻る">
+							<span className="nav-current">{lastLayout ? layoutLabel(lastLayout, lastIndex) : 'レイアウト'}</span>
+						</a>
+					)}
 					<a href="#/schedule" className={page === 'schedule' ? 'active' : ''}>スケジュール</a>
 				</nav>
 			</div>

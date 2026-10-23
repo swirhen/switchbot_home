@@ -250,6 +250,14 @@ nav a {
   border: 1px solid transparent;
   border-radius: 6px;
 }
+/* レイアウト以外のページで、最後に開いたレイアウトへ戻るリンク（レイアウトページの切り替えボタンと同じ見た目） */
+nav a.nav-link {
+  display: inline-flex;
+  align-items: center;
+}
+nav a.nav-link:hover {
+  color: #fff;
+}
 nav a.active {
   color: var(--green);
   border-color: var(--green);
