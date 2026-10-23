@@ -836,7 +836,29 @@ html.compact h2 {
   margin: 8px 0 4px;
 }
 html.compact .canvas-wrap {
+  /* 低い窓でもページ全体ではなく枠の中だけをスクロールさせる */
+  min-height: 0;
   margin-top: 4px;
   border: none;
   border-radius: 0;
+  /* 狭い窓では幅を空けないよう、標準のスクロールバーは隠し、スクロール中だけ重ねて出す（.overlay-scrollbar） */
+  scrollbar-gutter: auto;
+  scrollbar-width: none;
+}
+html.compact .canvas-wrap::-webkit-scrollbar {
+  display: none;
+}
+.overlay-scrollbar {
+  position: fixed;
+  z-index: 5;
+  width: 4px;
+  border-radius: 2px;
+  background: #ffffff66;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s;
+}
+.overlay-scrollbar.visible {
+  opacity: 1;
+  transition: opacity 0.1s;
 }

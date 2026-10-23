@@ -71,6 +71,50 @@ function TitleContent({ widget }: { widget: Pick<Widget, 'kind' | 'icon' | 'disp
 	)
 }
 
+// コンパクト表示のスクロールバー。標準のバーは幅を取るので隠し、スクロールしている間だけ細いバーを中身の上に重ねる。
+// 枠の中に置くと中身と一緒に流れるので、画面に固定（position: fixed）して枠の右端に合わせる
+function OverlayScrollbar({ target }: { target: React.RefObject<HTMLDivElement | null> }) {
+	const [thumb, setThumb] = React.useState<{ top: number; left: number; height: number } | null>(null)
+	const [visible, setVisible] = React.useState(false)
+	React.useEffect(() => {
+		const el = target.current
+		if (!el) return
+		let timer: number | undefined
+		const measure = () => {
+			const { scrollTop, scrollHeight, clientHeight } = el
+			if (scrollHeight <= clientHeight + 1) {
+				setThumb(null)
+				return
+			}
+			const rect = el.getBoundingClientRect()
+			const height = Math.max(24, clientHeight * clientHeight / scrollHeight)
+			const top = rect.top + scrollTop / (scrollHeight - clientHeight) * (clientHeight - height)
+			setThumb({ top, left: rect.right - 6, height })
+		}
+		const onScroll = () => {
+			measure()
+			setVisible(true)
+			window.clearTimeout(timer)
+			timer = window.setTimeout(() => setVisible(false), 800)
+		}
+		measure()
+		el.addEventListener('scroll', onScroll, { passive: true })
+		window.addEventListener('resize', measure)
+		// 中身の高さが変わったとき（状態の取得やレイアウトの切り替え）も測り直す
+		const observer = new ResizeObserver(measure)
+		observer.observe(el)
+		if (el.firstElementChild) observer.observe(el.firstElementChild)
+		return () => {
+			window.clearTimeout(timer)
+			el.removeEventListener('scroll', onScroll)
+			window.removeEventListener('resize', measure)
+			observer.disconnect()
+		}
+	}, [target])
+	if (!thumb) return null
+	return <div className={visible ? 'overlay-scrollbar visible' : 'overlay-scrollbar'} style={thumb} aria-hidden="true" />
+}
+
 // 表示名・アイコン・表示の仕方を編集する。グループは表示名だけ
 function WidgetEditor({ widget, onSave, onClose }: { widget: Widget; onSave: (patch: Partial<Widget>) => void; onClose: () => void }) {
 	const button = isButton(widget)
@@ -268,6 +312,7 @@ function LayoutEditor({ layout, layouts, onLogout, onCreate, onDelete, onRename 
 	const [contentKey, setContentKey] = React.useState('')
 	const [canvasWidth, setCanvasWidth] = React.useState(0)
 	const canvasRef = React.useRef<HTMLDivElement>(null)
+	const wrapRef = React.useRef<HTMLDivElement>(null)
 	const drag = React.useRef<Drag | null>(null)
 	const pendingSave = React.useRef(false)
 	const latestWidgets = React.useRef<Widget[]>(layout.widgets)
@@ -600,7 +645,8 @@ function LayoutEditor({ layout, layouts, onLogout, onCreate, onDelete, onRename 
 				</div>
 			)}
 
-			<div className="canvas-wrap">
+			{COMPACT && <OverlayScrollbar target={wrapRef} />}
+			<div className="canvas-wrap" ref={wrapRef}>
 				<div
 					ref={canvasRef}
 					className={editing ? 'canvas editing' : 'canvas'}
