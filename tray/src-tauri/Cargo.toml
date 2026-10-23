@@ -1,6 +1,6 @@
 [package]
 name = "switchbot-home-tray"
-version = "1.0.1"
+version = "1.0.2"
 description = "SwitchBot Home をタスクトレイから開くアプリ"
 edition = "2021"
 

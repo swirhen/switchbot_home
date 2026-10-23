@@ -3322,7 +3322,7 @@ dependencies = [
 
 [[package]]
 name = "switchbot-home-tray"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "tauri",
  "tauri-build",
