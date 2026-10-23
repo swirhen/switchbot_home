@@ -4,6 +4,7 @@
 //! SwitchBot Home をタスクトレイから開くアプリ。
 //! 窓は本番の Web アプリ（コンパクト表示）を直接開くだけで、画面や処理は持たない。
 
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -25,6 +26,12 @@ const REOPEN_GUARD: Duration = Duration::from_millis(300);
 const LAUNCH_REOPEN_GUARD: Duration = Duration::from_millis(1000);
 // フォーカスが外れた後、他のウインドウが前面に来たかを調べる間隔
 const FOREGROUND_POLL: Duration = Duration::from_millis(50);
+// 窓の大きさ（論理サイズ）。リサイズが落ち着いてから保存し、次の起動で使う
+const DEFAULT_SIZE: (u32, u32) = (420, 640);
+const MIN_SIZE: (u32, u32) = (300, 300);
+const MAX_SIZE: (u32, u32) = (4000, 4000);
+const SIZE_FILE: &str = "window-size.txt";
+const SIZE_SAVE_DELAY: Duration = Duration::from_millis(500);
 
 #[derive(Default)]
 struct TrayState {
@@ -33,6 +40,52 @@ struct TrayState {
     tray_center: Mutex<Option<PhysicalPosition<f64>>>,
     // フォーカスが変わるたびに増やし、古い監視を止める
     focus_generation: AtomicU64,
+    // リサイズのたびに増やし、落ち着いたら（増えなくなったら）保存する
+    resize_generation: AtomicU64,
+    // 最後に保存した（または読み込んだ）大きさ。同じなら書き込まない
+    saved_size: Mutex<Option<(u32, u32)>>,
+}
+
+/// 大きさを保存するファイル（%APPDATA%\<identifier>\window-size.txt）
+fn size_file(app: &AppHandle) -> Option<PathBuf> {
+    app.path().app_config_dir().ok().map(|dir| dir.join(SIZE_FILE))
+}
+
+/// 保存した大きさ（"幅x高さ" の論理サイズ）。無いか読めなければ None
+fn load_size(app: &AppHandle) -> Option<(u32, u32)> {
+    let text = std::fs::read_to_string(size_file(app)?).ok()?;
+    let (w, h) = text.trim().split_once('x')?;
+    let (w, h): (u32, u32) = (w.parse().ok()?, h.parse().ok()?);
+    Some((w.clamp(MIN_SIZE.0, MAX_SIZE.0), h.clamp(MIN_SIZE.1, MAX_SIZE.1)))
+}
+
+fn save_size(app: &AppHandle) -> Option<()> {
+    let window = main_window(app)?;
+    let size = window.inner_size().ok()?.to_logical::<f64>(window.scale_factor().ok()?);
+    let size = (size.width.round() as u32, size.height.round() as u32);
+    let state = app.state::<TrayState>();
+    let mut saved = state.saved_size.lock().unwrap();
+    // 拡大率の違う画面へ移したときも大きさの変化が届くが、論理サイズは変わらないので書き込まない
+    if *saved == Some(size) {
+        return Some(());
+    }
+    let path = size_file(app)?;
+    std::fs::create_dir_all(path.parent()?).ok()?;
+    std::fs::write(&path, format!("{}x{}", size.0, size.1)).ok()?;
+    *saved = Some(size);
+    Some(())
+}
+
+/// リサイズ中は何度も届くので、落ち着いてから保存する
+fn schedule_save_size(app: &AppHandle) {
+    let generation = app.state::<TrayState>().resize_generation.fetch_add(1, Ordering::Relaxed) + 1;
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(SIZE_SAVE_DELAY);
+        if app.state::<TrayState>().resize_generation.load(Ordering::Relaxed) == generation {
+            let _ = save_size(&app);
+        }
+    });
 }
 
 fn base_url() -> String {
@@ -198,10 +251,13 @@ fn main() {
         .manage(TrayState::default())
         .setup(|app| {
             let url = format!("{}?compact#/layout", base_url());
+            let saved = load_size(app.handle());
+            *app.state::<TrayState>().saved_size.lock().unwrap() = saved;
+            let (width, height) = saved.unwrap_or(DEFAULT_SIZE);
             let window = WebviewWindowBuilder::new(app, WINDOW_LABEL, WebviewUrl::External(url.parse()?))
                 .title("SwitchBot Home")
-                .inner_size(420.0, 640.0)
-                .min_inner_size(300.0, 300.0)
+                .inner_size(width as f64, height as f64)
+                .min_inner_size(MIN_SIZE.0 as f64, MIN_SIZE.1 as f64)
                 .decorations(false)
                 .resizable(true)
                 .skip_taskbar(true)
@@ -216,6 +272,7 @@ fn main() {
                 WindowEvent::Focused(true) => {
                     handle.state::<TrayState>().focus_generation.fetch_add(1, Ordering::Relaxed);
                 }
+                WindowEvent::Resized(_) => schedule_save_size(&handle),
                 // Alt+F4 などで閉じてもアプリは終わらせず、隠すだけにする
                 WindowEvent::CloseRequested { api, .. } => {
                     api.prevent_close();
@@ -277,7 +334,10 @@ fn main() {
                             let _ = autostart_item.set_checked(manager.is_enabled().unwrap_or(false));
                         }
                     }
-                    "quit" => app.exit(0),
+                    "quit" => {
+                        let _ = save_size(app);
+                        app.exit(0);
+                    }
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
