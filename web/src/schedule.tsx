@@ -448,7 +448,7 @@ export function SchedulePage({ onLogout }: { onLogout: () => void }) {
 					<button onClick={() => setEditingSchedule(newSchedule())} disabled={!data}><Plus size={16} /> 追加</button>
 				</div>
 				<div className="table-wrap">
-					<table className={narrow ? 'narrow-table' : ''}>
+					<table className={narrow ? 'narrow-font narrow-table' : ''}>
 						<thead>
 							{narrow ? (
 								<tr><th>有効</th><th>名前</th><th>日付<br />時間</th><th>開始時の操作<br />終了時の操作</th><th>次回<br />最終実行</th><th></th></tr>
@@ -504,7 +504,7 @@ export function SchedulePage({ onLogout }: { onLogout: () => void }) {
 					<button onClick={() => setEditingOuting(newOuting())} disabled={!data}><Plus size={16} /> 追加</button>
 				</div>
 				<div className="table-wrap">
-					<table>
+					<table className={narrow ? 'narrow-font' : ''}>
 						<thead>
 							<tr><th>有効</th><th>名前</th><th>期間</th><th>オフにするスケジュール</th><th>状態</th><th></th></tr>
 						</thead>

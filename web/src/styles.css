@@ -543,18 +543,19 @@ tbody tr:last-child td {
 tr.disabled td:not(:first-child) {
   opacity: 0.45;
 }
-/* 幅の狭い画面のスケジュール表。関連する列を 2 行にまとめ、文字・余白・スイッチ・ボタンを小さくして横に収める */
-table.narrow-table {
+/* 幅の狭い画面の表（スケジュール・外出予定）。文字と余白を小さくする */
+table.narrow-font {
   font-size: 11px;
 }
-table.narrow-table th,
-table.narrow-table td {
+table.narrow-font th,
+table.narrow-font td {
   padding: 4px 5px;
   line-height: 1.35;
 }
-table.narrow-table th {
+table.narrow-font th {
   font-size: 10px;
 }
+/* スケジュール表はさらに関連する列を 2 行にまとめ、スイッチ・ボタンも小さくして横に収める */
 /* 名前が 1 文字ずつ折り返さないようにする */
 table.narrow-table td:nth-child(2) {
   min-width: 4.5em;
