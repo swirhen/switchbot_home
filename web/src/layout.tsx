@@ -583,8 +583,11 @@ function LayoutEditor({ layout, layouts, onLogout, onCreate, onDelete, onRename 
 	// 高さは中身に合わせて伸ばす（枠より小さいときは CSS の min-height で枠いっぱいにする）
 	const canvasHeight = widgets.reduce((max, w) => Math.max(max, w.y + w.h), 0) + 200
 
+	// コンパクト表示では、左端のウィジェットまでの余白を右端（GRID）と揃えるよう、配置全体を横にずらす
+	const minX = widgets.length ? Math.min(...widgets.map(w => w.x)) : 0
+	const offsetX = COMPACT ? GRID - minX : 0
 	// コンパクト表示では、配置が窓より広ければ窓の幅に合わせて全体を縮小する
-	const contentWidth = widgets.reduce((max, w) => Math.max(max, w.x + w.w), 0) + GRID
+	const contentWidth = widgets.reduce((max, w) => Math.max(max, w.x + w.w), 0) + GRID + offsetX
 	const scale = COMPACT && canvasWidth && contentWidth > canvasWidth ? canvasWidth / contentWidth : 1
 	const contentHeight = COMPACT ? widgets.reduce((max, w) => Math.max(max, w.y + w.h), 0) + GRID : canvasHeight
 
@@ -657,7 +660,10 @@ function LayoutEditor({ layout, layouts, onLogout, onCreate, onDelete, onRename 
 							{COMPACT ? 'このレイアウトは空です。ブラウザで開いて編集してください。' : '上のプルダウンから機器やシーンを選んで「追加」してください。'}
 						</p>
 					)}
-					<div className="canvas-scale" style={scale === 1 ? undefined : { transform: `scale(${scale})`, width: contentWidth, height: contentHeight }}>
+					<div
+						className="canvas-scale"
+						style={scale === 1 && offsetX === 0 ? undefined : { transform: `scale(${scale}) translateX(${offsetX}px)`, width: contentWidth, height: contentHeight }}
+					>
 					{/* グループは常に他のウィジェットより奥に描く */}
 					{[...widgets.filter(w => w.kind === 'group'), ...widgets.filter(w => w.kind !== 'group')].map(widget => {
 						const isGroup = widget.kind === 'group'
