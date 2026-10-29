@@ -929,3 +929,26 @@ html.compact .canvas-wrap::-webkit-scrollbar {
   opacity: 1;
   transition: opacity 0.1s;
 }
+/* 一覧ページの下の MCP コネクタ（普段は畳んでおく） */
+.mcp-panel summary {
+  cursor: pointer;
+}
+.mcp-panel summary h2 {
+  display: inline;
+  font-size: 1.2em;
+}
+.mcp-panel p {
+  margin: 8px 0;
+}
+.mcp-url {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.mcp-url input {
+  width: 100%;
+  max-width: 720px;
+  box-sizing: border-box;
+  font: 13px "IBM Plex Mono";
+}

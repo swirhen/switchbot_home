@@ -1,0 +1,19 @@
+[Unit]
+Description=SwitchBot Home MCP サーバー（AI から機器・シーン・スケジュールを扱う）
+After=network-online.target switchbot-home-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=swirhen
+Group=swirhen
+WorkingDirectory=/home/swirhen/switchbot_home
+# Web API と同じログイン情報（web_secret など）でトークンを作るので、同じ環境変数を読む
+EnvironmentFile=-/etc/default/switchbot-home-api
+ExecStart=/home/swirhen/switchbot_home/web/.venv/bin/python mcp_server/server.py
+Restart=on-failure
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

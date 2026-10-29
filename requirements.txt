@@ -4,3 +4,4 @@ requests>=2.31.0
 uvicorn[standard]>=0.28.0
 jpholiday>=0.1.10
 tzdata>=2024.1
+mcp==2.3.0

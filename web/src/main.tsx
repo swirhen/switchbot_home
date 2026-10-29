@@ -7,6 +7,7 @@ import {
 	api, base, deviceActions, errorMessage, executeScene, hasStatus, sendCommand, setAuthToken, supportsOnOff, useToast,
 } from './common'
 import { LayoutPage } from './layout'
+import { McpPanel } from './mcp'
 import { SchedulePage } from './schedule'
 import './styles.css'
 
@@ -232,6 +233,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 					})}
 				</div>
 			</section>
+
+			<McpPanel showToast={showToast} onError={handleError} />
 
 			{selected.size > 0 && (
 				<div className="batch-bar">

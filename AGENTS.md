@@ -4,6 +4,9 @@
 
 - SwitchBot API v1.1 を使い、アカウントに登録された機器の状態確認・一括操作・シーン実行を行う Web アプリ。
 - 構成は FastAPI（`web/api.py`）+ React/Vite（`web/src/`）。
+- AI 向けの MCP サーバー（`mcp_server/server.py`）を systemd の `switchbot-home-mcp.service`（`127.0.0.1:8008`）で動かし、Apache の `/switchbot_home/mcp/` で公開する。コネクタの URL は `/switchbot_home/mcp/<トークン>` で、トークンはリポジトリ直下の `mcp_token`（Git 管理外。`mcp_token.py` で読み書きし、一覧ページの下の「MCP コネクタ」から発行・作り直しできる。MCP サーバーは毎回ファイルを確かめるので再起動は要らない）。
+- MCP サーバーは SwitchBot API を直接呼ばず、`SWITCHBOT_HOME_API`（既定 `http://127.0.0.1:8002/api`）の Web API を経由する（呼び出し回数・キャッシュ・赤外線リモコンの記録を画面と共有するため）。Web API へは `web_secret` で作ったログインと同じ形のトークンを付ける。機器一覧・状態・コマンド送信、シーンの一覧・実行、スケジュールと外出予定の確認・追加・変更・削除ができる。
+- ロックの解錠（`unlock` / `unlatch`）は、`config.json` の `mcp_allow_unlock`（環境変数 `SWITCHBOT_HOME_MCP_ALLOW_UNLOCK`）が true のときだけ MCP から行える（既定は不可。スケジュールへの登録も同じ）。
 - API 仕様の一次情報: https://github.com/OpenWonderLabs/SwitchBotAPI （機器別の詳細は `devices/<カテゴリ>/*.md`）
 
 ## 主なファイル
@@ -18,6 +21,8 @@
 - `web/scheduler.py`: スケジュールの判定（日付条件・翌日にまたがる時間・外出予定・祝日は `jpholiday`）と、毎分の実行ループ。
 - `web/schedules.json` / `web/schedule_state.json`: スケジュールと外出予定、最終実行の記録（Git 管理外）。
 - `web/layout.json`: レイアウトページの配置（`{"layouts": [{"id", "name", "widgets"}]}`、Git 管理外。画面の編集内容が自動保存される。旧形式の `{"widgets"}` は 1 つ目のレイアウトとして読む）。
+- `mcp_server/server.py`: AI 向けの MCP サーバー（Streamable HTTP）。`mcp_server/switchbot-home-mcp.service` が systemd ユニット。
+- `mcp_token.py` / `mcp_token`: MCP のコネクタ URL のトークン（`mcp_token` は Git 管理外）。画面は `web/src/mcp.tsx`、API は `/api/mcp-token`。
 - `config.json`: SwitchBot のトークン/シークレットと画面のログイン情報（Git 管理外。雛形は `config.example.json`）。環境変数 `SWITCHBOT_TOKEN` / `SWITCHBOT_SECRET` / `SWITCHBOT_HOME_USERNAME` / `SWITCHBOT_HOME_PASSWORD` / `SWITCHBOT_HOME_SECRET` があればそちらを優先する。
 - `web/ir_state.json`: 赤外線リモコンに最後に送ったコマンドの記録（Git 管理外）。
 
@@ -33,7 +38,8 @@
 
 - Python の venv はリポジトリ外の `~\.venv\switchbot_home` に PC ごとに作る（ソースは OneDrive で PC 間共有するため）。
   作成: `python -m venv $env:USERPROFILE\.venv\switchbot_home; & $env:USERPROFILE\.venv\switchbot_home\Scripts\python.exe -m pip install -r requirements.txt`
-- Python 変更後は `python -m py_compile switchbot_client.py web/api.py` を実行する。
+- Python 変更後は `python -m py_compile switchbot_client.py mcp_token.py web/api.py web/scheduler.py mcp_server/server.py` を実行する。
+- MCP サーバーを手元で試すときは、API を起動した状態で `& $env:USERPROFILE\.venv\switchbot_home\Scripts\python.exe mcp_server/server.py`（8008）。トークンが無ければ `python mcp_token.py --generate` で作る。機器の操作・シーンの実行は本物の機器が動くので、試すのは読み取りとスケジュールの編集（手元の `web/schedules.json`）にとどめる。
 - フロントエンド変更後は `cd web; npm.cmd run build` を実行する。
 - ローカル一括起動は `.\start_debug.ps1`（または `start_debug.bat`）。画面は `http://127.0.0.1:5175/`、API は `http://127.0.0.1:8002`（torrentsearch（8000/5173）・radio_record（8001/5174）と衝突しないようにずらしている）。
 
@@ -42,7 +48,8 @@
 - 配置先は `prod-checker` の `/home/swirhen/switchbot_home`、公開 URL は `https://swirhen.tv/switchbot_home/`。
 - SSH は `projects\config` を使う（`ssh -F ..\config -o BatchMode=yes prod-checker ...`）。
 - GitHub へプッシュした後、`ssh -F ..\config prod-checker "cd /home/swirhen/switchbot_home && git pull --ff-only && cd web && ./release.sh"` で更新・ビルド・API 再起動を行う。
-- 実行後、`ssh -F ..\config prod-checker "systemctl is-active switchbot-home-api.service"` で `active` を確認する。
+- 実行後、`ssh -F ..\config prod-checker "systemctl is-active switchbot-home-api.service switchbot-home-mcp.service"` ですべて `active` を確認する（`release.sh` は両方を再起動する）。
+- 依存パッケージを変えた場合は、`release.sh` の前に `web/.venv/bin/pip install -r ../requirements.txt` も実行する。
 - `release.sh` は `VITE_BASE_PATH=/switchbot_home/` でビルドする。
 
 ## タスクトレイアプリ（`tray/`）

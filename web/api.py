@@ -14,6 +14,7 @@ from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Requ
 from pydantic import BaseModel, Field
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from switchbot_client import SwitchBotClient, SwitchBotError, load_config
+from mcp_token import generate_token, token_info
 import scheduler as sched
 
 
@@ -336,6 +337,18 @@ def logout(response: Response):
 @app.get('/api/usage')
 def usage(_auth=Depends(require_auth)):
     return client.usage()
+
+
+@app.get('/api/mcp-token')
+def get_mcp_token(_auth=Depends(require_auth)):
+    # MCP サーバーのコネクタ URL に含めるトークン（未発行なら token は null）
+    return token_info()
+
+
+@app.post('/api/mcp-token')
+def regenerate_mcp_token(_auth=Depends(require_auth)):
+    # 前のトークンはすぐ使えなくなる（MCP サーバーは毎回ファイルを確かめる）
+    return generate_token()
 
 
 @app.get('/api/devices')
